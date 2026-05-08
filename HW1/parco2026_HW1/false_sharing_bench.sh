@@ -3,8 +3,8 @@
 # Runs 4 experiments:
 #   A: Dense M sweep (primary data)
 #   B: Paired analysis (extracted from A, no extra runs)
-#   C: Thread count scaling (M=16 vs M=17)
-#   D: Padding threshold (M=17, threads=16)
+#   C: Thread count scaling (M=32 vs M=33)
+#   D: Padding threshold (M=33, threads=4)
 #
 # Usage: ./false_sharing_bench.sh [output_dir]
 
@@ -23,19 +23,19 @@ FS_N=10000000
 FS_SEED=42
 
 # Experiment A: Dense M sweep
-M_VALUES="8 9 12 16 17 20 24 32 33 36 48 64 65 72 96 128 129 256"
-EXP_A_THREADS=16
+M_VALUES="8 9 12 16 17 18 20 24 32 33 36 48 64 65 72"
+EXP_A_THREADS=4
 EXP_A_PADDING=0
 
 # Experiment C: Thread scaling
-EXP_C_M_ALIGNED=16
-EXP_C_M_MISALIGNED=17
+EXP_C_M_ALIGNED=32
+EXP_C_M_MISALIGNED=33
 EXP_C_THREADS="1 2 4 8 16"
 EXP_C_PADDING=0
 
 # Experiment D: Padding threshold
-EXP_D_M=17
-EXP_D_THREADS=16
+EXP_D_M=33
+EXP_D_THREADS=4
 EXP_D_PADDINGS="0 4 8 16 32 64 128"
 
 NUM_RUNS=5
@@ -107,25 +107,38 @@ import csv, sys
 
 rows = {int(r['M']): r for r in csv.DictReader(open(sys.argv[1]))}
 
-pairs = [
-    (8, 9, "Small array: relative penalty?"),
-    (16, 17, "1 cache line vs 1+spill"),
-    (32, 33, "Same spill(4B), larger array"),
-    (32, 36, "Larger spill(16B)"),
-    (64, 65, "4 lines vs 4+spill"),
-    (64, 72, "Even larger spill(32B)"),
+sub1 = [
+    (8, 9, "Minimal spill (+1 int)"),
+    (16, 17, "Minimal spill (+1 int)"),
+    (32, 33, "Minimal spill (+1 int)"),
+    (64, 65, "Minimal spill (+1 int)"),
 ]
 
-print(f"\n{'Pair':<6} {'Aligned':<10} {'Misaligned':<12} {'Time(A)':<12} {'Time(M)':<12} {'Penalty':<10} {'Note'}")
-print("─" * 85)
-for i, (aligned_m, misaligned_m, note) in enumerate(pairs, 1):
-    if aligned_m in rows and misaligned_m in rows:
-        ta = float(rows[aligned_m]['mean_sec'])
-        tm = float(rows[misaligned_m]['mean_sec'])
-        penalty = (tm - ta) / ta * 100 if ta > 0 else 0
-        print(f"  {i:<4} M={aligned_m:<6} M={misaligned_m:<8} {ta:<12.6f} {tm:<12.6f} {penalty:>+7.1f}%   {note}")
-    else:
-        print(f"  {i:<4} M={aligned_m:<6} M={misaligned_m:<8} {'N/A':<12} {'N/A':<12} {'N/A':<10} {note}")
+sub2 = [
+    (8, 9, "Spill = 4B"),
+    (16, 18, "Spill = 8B"),
+    (32, 36, "Spill = 16B"),
+    (64, 72, "Spill = 32B"),
+]
+
+def print_sub(name, pairs):
+    print(f"\n  {name}")
+    print(f"  {'Pair':<6} {'Aligned':<10} {'Misaligned':<12} {'Time(A)':<12} {'Time(M)':<12} {'Penalty':<10} {'Note'}")
+    print("  " + "─" * 83)
+    for i, (aligned_m, misaligned_m, note) in enumerate(pairs, 1):
+        if aligned_m in rows and misaligned_m in rows:
+            ta = float(rows[aligned_m]['mean_sec'])
+            tm = float(rows[misaligned_m]['mean_sec'])
+            penalty = (tm - ta) / ta * 100 if ta > 0 else 0
+            print(f"    {i:<4} M={aligned_m:<6} M={misaligned_m:<8} {ta:<12.6f} {tm:<12.6f} {penalty:>+7.1f}%   {note}")
+        else:
+            missing = []
+            if aligned_m not in rows: missing.append(f"M={aligned_m}")
+            if misaligned_m not in rows: missing.append(f"M={misaligned_m}")
+            print(f"    {i:<4} M={aligned_m:<6} M={misaligned_m:<8} {'N/A':<12} {'N/A':<12} {'N/A':<10} {note} (missing: {', '.join(missing)})")
+
+print_sub("Sub-setting 1: Minimal spill (aligned vs aligned+1)", sub1)
+print_sub("Sub-setting 2: Increasing spill amount", sub2)
 print()
 PYEOF
 echo ""

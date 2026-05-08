@@ -1,7 +1,6 @@
 CC       = g++ -std=c++11
 OMP_FLAG = -fopenmp
-OPT      = -O2
-FAST_OPT = -O3 -march=native
+OPT      = -O3 -march=native
 
 # Executables
 SERIAL       = serial
@@ -21,7 +20,7 @@ histogram_omp: histogram_omp.cpp
 
 # Optimized fast version
 histogram_fast: histogram_fast.cpp
-	$(CC) $(FAST_OPT) $(OMP_FLAG) -o $@ $^ $(FLAGS)
+	$(CC) $(OPT) $(OMP_FLAG) -o $@ $^ $(FLAGS)
 
 # False sharing experiment
 false_sharing_exp: false_sharing_exp.cpp

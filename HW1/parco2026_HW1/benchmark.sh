@@ -76,6 +76,13 @@ for input in $INPUTS; do
                 # Run via histogram_omp serial for consistency check
             fi
 
+            # Cap thread count for atomic/critical (they scale negatively)
+            if [ "$strategy" = "atomic" ] || [ "$strategy" = "critical" ]; then
+                if [ "$threads" -gt 4 ]; then
+                    continue
+                fi
+            fi
+
             export OMP_NUM_THREADS=$threads
             output_file="$RESULT_DIR/out_${strategy}_t${threads}_$(basename $input .dat).dat"
 
