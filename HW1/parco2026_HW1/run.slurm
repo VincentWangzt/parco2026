@@ -1,10 +1,46 @@
 #!/bin/bash
 #SBATCH -o job_%j_%N.out
 #SBATCH -p cpu
-#SBATCH -J hw1
+#SBATCH -J parco_hw1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1
-#SBATCH -t 5:00
+#SBATCH --cpus-per-task=16
+#SBATCH -t 15:00
+#SBATCH --exclusive
 
-./serial input1.dat output1.dat
+echo "═══════════════════════════════════════════════════"
+echo " PARCO HW1 — Job $SLURM_JOB_ID on $(hostname)"
+echo " Date: $(date)"
+echo " CPUs: $SLURM_CPUS_PER_TASK"
+echo "═══════════════════════════════════════════════════"
+echo ""
+
+# Thread affinity for consistent results
+export OMP_PROC_BIND=close
+export OMP_PLACES=cores
+
+# Generate inputs if needed
+[ -f input1.dat ] || python3 gen_input.py
+[ -f input2.dat ] || python3 gen_input.py
+
+# Build
+make all
+
+# Run full strategy benchmark
+echo ""
+echo "╔═══════════════════════════════════════════════════╗"
+echo "║  Running Strategy Benchmark                      ║"
+echo "╚═══════════════════════════════════════════════════╝"
+chmod +x benchmark.sh
+./benchmark.sh results_slurm
+
+# Run false sharing experiment
+echo ""
+echo "╔═══════════════════════════════════════════════════╗"
+echo "║  Running False Sharing Experiment                ║"
+echo "╚═══════════════════════════════════════════════════╝"
+chmod +x false_sharing_bench.sh
+./false_sharing_bench.sh results_slurm
+
+echo ""
+echo "Done at $(date)"
