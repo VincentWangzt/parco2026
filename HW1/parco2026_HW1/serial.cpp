@@ -7,6 +7,9 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <chrono>
+#include <numeric>
+#include <cmath>
 
 using namespace std;
 
@@ -75,7 +78,33 @@ int main(int argc, char* argv[]) {
         utils::abort_with_error_message("ERROR: Usage: ./serial <input_file> <output_file>");
 
     utils::read_inputs(argv[1]);
-    utils::compute_histogram();
+
+    // Timing: 2 warmup + 5 measured runs, compute only
+    const int warmup = 2;
+    const int num_runs = 5;
+
+    for (int r = 0; r < warmup; ++r) {
+        fill(utils::hist.begin(), utils::hist.end(), 0);
+        utils::compute_histogram();
+    }
+
+    vector<double> times(num_runs);
+    for (int r = 0; r < num_runs; ++r) {
+        fill(utils::hist.begin(), utils::hist.end(), 0);
+        auto t0 = chrono::high_resolution_clock::now();
+        utils::compute_histogram();
+        auto t1 = chrono::high_resolution_clock::now();
+        times[r] = chrono::duration<double>(t1 - t0).count();
+    }
+
+    double mean = accumulate(times.begin(), times.end(), 0.0) / num_runs;
+    double sq_sum = 0.0;
+    for (double t : times) sq_sum += (t - mean) * (t - mean);
+    double stddev = sqrt(sq_sum / num_runs);
+
+    cerr << "TIMING,serial,1," << utils::N << "," << utils::M << ","
+         << mean << "," << stddev << endl;
+
     utils::write_outputs(argv[2]);
 
     return 0;
