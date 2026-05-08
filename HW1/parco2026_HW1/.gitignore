@@ -1,0 +1,15 @@
+# Compiled binaries
+serial
+histogram_omp
+histogram_fast
+false_sharing_exp
+
+# Generated data files
+*.dat
+
+# SLURM output
+job_*.out
+
+# Temporary results (keep results/ directory for committed baselines)
+results_test/
+results_slurm/
