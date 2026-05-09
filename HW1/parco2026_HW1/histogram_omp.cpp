@@ -4,7 +4,8 @@
  * OpenMP histogram: unified multi-strategy implementation.
  *
  * Usage: ./histogram_omp <strategy> <input> <output> [runs=5] [warmup=2]
- * Strategies: serial, atomic, critical, private, padded, reduction
+ * Strategies: serial, atomic, critical, private, padded[, reduction*]
+ *   (* reduction requires OpenMP 4.5+; auto-detected at build time)
  *
  * Timing output (stderr):
  *   TIMING,<strategy>,<threads>,<N>,<M>,<mean_sec>,<std_sec>
@@ -204,7 +205,8 @@ void hist_padded() {
 }
 
 // Strategy 6: OpenMP 4.5+ array section reduction (compiler-managed)
-/*
+// Automatically enabled when compiled with -DHAS_OMP45_REDUCTION (see Makefile).
+#ifdef HAS_OMP45_REDUCTION
 void hist_reduction() {
     double bin_width = (utils::max_val - utils::min_val) / utils::M;
     int M = utils::M;
@@ -218,7 +220,7 @@ void hist_reduction() {
         hist_arr[bin]++;
     }
 }
-*/
+#endif
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Strategy Registry
@@ -237,7 +239,9 @@ static StrategyEntry strategies[] = {
     {"critical",  hist_critical},
     {"private",   hist_private},
     {"padded",    hist_padded},
-//    {"reduction", hist_reduction},
+#ifdef HAS_OMP45_REDUCTION
+    {"reduction", hist_reduction},
+#endif
 };
 static const int NUM_STRATEGIES = sizeof(strategies) / sizeof(strategies[0]);
 

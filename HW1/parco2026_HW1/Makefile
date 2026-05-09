@@ -2,6 +2,22 @@ CC       = g++ -std=c++11
 OMP_FLAG = -fopenmp
 OPT      = -O3 -march=native
 
+# ── OpenMP 4.5+ array reduction detection ────────────────────────────────────
+# Try to compile a minimal snippet using reduction(+:arr[:n]).
+# If the compiler supports it, define HAS_OMP45_REDUCTION so the code
+# conditionally includes the reduction strategy.
+OMP45_TEST := $(shell printf '%s\n' '\#include <omp.h>' \
+  'int main(){int a[4]={}; int n=4;' \
+  '_Pragma("omp parallel for reduction(+:a[:n])")' \
+  'for(int i=0;i<n;i++) a[i]++; return 0;}' | \
+  $(CC) $(OMP_FLAG) -x c++ -o /dev/null - 2>/dev/null && echo yes || echo no)
+
+ifeq ($(OMP45_TEST),yes)
+  OMP45_FLAGS = -DHAS_OMP45_REDUCTION
+else
+  OMP45_FLAGS =
+endif
+
 # Executables
 SERIAL       = serial
 HISTOGRAM    = histogram_omp
@@ -9,6 +25,7 @@ FAST         = histogram_fast
 FALSESHARE   = false_sharing_exp
 
 all: $(SERIAL) $(HISTOGRAM) $(FAST) $(FALSESHARE)
+	@echo "[INFO] OpenMP 4.5+ array reduction: $(OMP45_TEST)"
 
 # Serial: NO -fopenmp, uses <chrono> for timing
 serial: serial.cpp
@@ -16,7 +33,7 @@ serial: serial.cpp
 
 # Multi-strategy OpenMP version
 histogram_omp: histogram_omp.cpp
-	$(CC) $(OPT) $(OMP_FLAG) -o $@ $^ $(FLAGS)
+	$(CC) $(OPT) $(OMP_FLAG) $(OMP45_FLAGS) -o $@ $^ $(FLAGS)
 
 # Optimized fast version
 histogram_fast: histogram_fast.cpp
@@ -35,10 +52,10 @@ inputs-bin: inputs
 	python3 convert_to_binary.py input1.dat input1.bin
 	python3 convert_to_binary.py input2.dat input2.bin
 
-# Quick correctness check
+# Quick correctness check (auto-detects available strategies)
 check: $(HISTOGRAM)
 	@echo "=== Checking all strategies ==="
-	@for s in serial atomic critical private padded reduction; do \
+	@for s in $$(./$(HISTOGRAM) 2>&1 | grep -oP '(?<=Strategies:).*'); do \
 		echo -n "  $$s: "; \
 		OMP_NUM_THREADS=4 ./$(HISTOGRAM) $$s input1.dat output_check.dat 2>/dev/null; \
 		python3 check.py input1.dat output_check.dat | tail -1; \

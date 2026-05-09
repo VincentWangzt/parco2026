@@ -13,8 +13,8 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 CSV="$RESULT_DIR/benchmark_${TIMESTAMP}.csv"
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-# STRATEGIES="serial atomic critical private padded reduction"
-STRATEGIES="serial atomic critical private padded"
+# Strategies are auto-detected from the compiled binary after build.
+# (reduction is included automatically when OpenMP 4.5+ is available)
 THREAD_COUNTS="1 2 4 8 16"
 INPUTS="input1.dat input2.dat"
 NUM_RUNS=20
@@ -30,6 +30,16 @@ echo ""
 # Build
 echo "[BUILD] Compiling all targets..."
 make all 2>&1 | grep -v "^make\[" || true
+echo ""
+
+# Auto-detect available strategies from the compiled binary
+# The binary prints available strategy names in its usage line when invoked without args
+STRATEGIES=$(./histogram_omp 2>&1 | grep -oP '(?<=Strategies:).*' | tr -s ' ' | xargs)
+if [ -z "$STRATEGIES" ]; then
+    # Fallback: safe list that works with any OpenMP version
+    STRATEGIES="serial atomic critical private padded"
+fi
+echo "[INFO] Available strategies: $STRATEGIES"
 echo ""
 
 # Generate inputs if missing
