@@ -6,6 +6,7 @@ false_sharing_exp
 
 # Generated data files
 *.dat
+*.bin
 
 # SLURM output
 job_*.out

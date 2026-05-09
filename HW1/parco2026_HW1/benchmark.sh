@@ -16,7 +16,7 @@ CSV="$RESULT_DIR/benchmark_${TIMESTAMP}.csv"
 STRATEGIES="serial atomic critical private padded reduction"
 THREAD_COUNTS="1 2 4 8 16"
 INPUTS="input1.dat input2.dat"
-NUM_RUNS=5
+NUM_RUNS=20
 WARMUP=2
 # ──────────────────────────────────────────────────────────────────────────────
 

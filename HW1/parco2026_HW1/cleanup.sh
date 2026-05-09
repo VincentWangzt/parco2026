@@ -39,13 +39,18 @@ rm -f *.o
 
 # ── Output .dat files (histogram results, not inputs) ────────────────────────
 rm -f output*.dat
+rm -f output*.bin
 rm -f results/out_*.dat
+rm -f results/out_*.bin
+
 
 # ── Generated input data ─────────────────────────────────────────────────────
 if [ "$KEEP_INPUTS" = false ]; then
     echo "[CLEANUP] Removing generated input files..."
     rm -f input1.dat input2.dat
-    rm -f results/input_m*.dat
+    rm -f input1.bin input2.bin
+    rm -f results/input_fs.dat
+    rm -f results/input_fs.bin
 fi
 
 # ── CSV result files (only with --all) ───────────────────────────────────────
