@@ -60,7 +60,7 @@ inputs-bin: inputs
 # Quick correctness check (auto-detects available strategies)
 check: $(HISTOGRAM)
 	@echo "=== Checking all strategies ==="
-	@for s in $$(./$(HISTOGRAM) 2>&1 | grep -oP '(?<=Strategies:).*'); do \
+	@for s in $$(./$(HISTOGRAM) 2>&1 | sed -n 's/.*Strategies: *//p'); do \
 		echo -n "  $$s: "; \
 		OMP_NUM_THREADS=4 ./$(HISTOGRAM) $$s input1.dat output_check.dat 2>/dev/null; \
 		python3 check.py input1.dat output_check.dat | tail -1; \

@@ -33,8 +33,11 @@ make all 2>&1 | grep -v "^make\[" || true
 echo ""
 
 # Auto-detect available strategies from the compiled binary
-# The binary prints available strategy names in its usage line when invoked without args
-STRATEGIES=$(./histogram_omp 2>&1 | grep -oP '(?<=Strategies:).*' | tr -s ' ' | xargs)
+# The binary prints available strategy names in its usage line when invoked without args.
+# Note: ./histogram_omp exits with code 1 when called without args (usage error),
+# so we must ignore the exit code to avoid tripping set -e / pipefail.
+STRATEGIES=$(./histogram_omp 2>&1 || true)
+STRATEGIES=$(echo "$STRATEGIES" | sed -n 's/.*Strategies: *//p' | tr -s ' ' | xargs)
 if [ -z "$STRATEGIES" ]; then
     # Fallback: safe list that works with any OpenMP version
     STRATEGIES="serial atomic critical private padded"
