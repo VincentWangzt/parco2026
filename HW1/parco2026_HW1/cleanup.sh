@@ -61,8 +61,10 @@ if [ "$REMOVE_CSV" = true ]; then
     echo "[CLEANUP] Removing CSV result files..."
     rm -f results/benchmark_*.csv
     rm -f results/fs_exp*.csv
+    rm -f results/fs_padding_sweep_*.csv
     rm -f results_slurm/benchmark_*.csv
     rm -f results_slurm/fs_exp*.csv
+    rm -f results_slurm/fs_padding_sweep_*.csv
 fi
 
 # ── Remove results/ dir if empty ─────────────────────────────────────────────

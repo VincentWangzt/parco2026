@@ -1,12 +1,13 @@
 #!/bin/bash
-# false_sharing_bench.sh — False Sharing Experiment Sweep
-# Runs 4 experiments using a SINGLE input file with varying M values:
-#   A: Dense M sweep (primary data)
-#   B: Paired analysis (extracted from A, no extra runs)
-#   C: Thread count scaling (M=32 vs M=33)
-#   D: Padding threshold (M=33, threads=4)
+# false_sharing_bench.sh — False Sharing Padding Sweep
 #
-# The same input file is reused across all experiments; M is overridden via CLI.
+# For each M value, sweep padding_bytes and thread counts to demonstrate
+# the false sharing effect and its elimination via padding.
+#
+# M values chosen for their cache-line alignment properties:
+#   M=8   → stride=32B (half a cache line)  → maximum false sharing
+#   M=33  → stride=132B (spill=4B)          → moderate false sharing
+#   M=128 → stride=512B (exactly 8 lines)   → no false sharing (control)
 #
 # Usage: ./false_sharing_bench.sh [output_dir]
 
@@ -15,44 +16,33 @@ set -euo pipefail
 RESULT_DIR="${1:-results}"
 mkdir -p "$RESULT_DIR"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-CSV_A="$RESULT_DIR/fs_expA_dense_${TIMESTAMP}.csv"
-CSV_C="$RESULT_DIR/fs_expC_threads_${TIMESTAMP}.csv"
-CSV_D="$RESULT_DIR/fs_expD_padding_${TIMESTAMP}.csv"
+CSV_OUT="$RESULT_DIR/fs_padding_sweep_${TIMESTAMP}.csv"
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-# Use N=100M, uniform [0,1)
 FS_N=100000000
 FS_SEED=42
-FS_M_FILE=256          # M stored in the input file (arbitrary, will be overridden)
+FS_M_FILE=256          # M stored in the input file (will be overridden per run)
 
 # Single input file for all experiments
 INPUT_FILE="$RESULT_DIR/input_fs.dat"
 INPUT_FILE_BIN="$RESULT_DIR/input_fs.bin"
 
-# Experiment A: Dense M sweep
-M_VALUES="8 9 12 16 17 18 20 24 32 33 36 48 64 65 72"
-EXP_A_THREADS=16
-EXP_A_PADDING=0
-
-# Experiment C: Thread scaling
-EXP_C_M_ALIGNED=32
-EXP_C_M_MISALIGNED=33
-EXP_C_THREADS="1 2 4 8 16"
-EXP_C_PADDING=0
-
-# Experiment D: Padding threshold
-EXP_D_M=33
-EXP_D_THREADS=16
-EXP_D_PADDINGS="0 4 8 16 32 64 128"
+# Experiment parameters
+M_VALUES="8 33 128"
+PADDING_VALUES="0 4 8 16 32 64 128 256 512"
+THREAD_VALUES="4 16"
 
 NUM_RUNS=20
 WARMUP=2
 # ──────────────────────────────────────────────────────────────────────────────
 
 echo "═══════════════════════════════════════════════════"
-echo " False Sharing Experiment Suite"
+echo " False Sharing Padding Sweep"
 echo " N=$FS_N, seed=$FS_SEED"
-echo " Single input file, M overridden per run"
+echo " M values: $M_VALUES"
+echo " Padding:  $PADDING_VALUES"
+echo " Threads:  $THREAD_VALUES"
+echo " Runs=$NUM_RUNS, Warmup=$WARMUP"
 echo "═══════════════════════════════════════════════════"
 echo ""
 
@@ -62,7 +52,7 @@ make false_sharing_exp 2>&1 | grep -v "^make\[" || true
 echo ""
 
 # ── Generate single input file ───────────────────────────────────────────────
-echo "[GEN] Generating single input file (N=$FS_N, M_file=$FS_M_FILE)..."
+echo "[GEN] Generating input file (N=$FS_N, M_file=$FS_M_FILE)..."
 if [ ! -f "$INPUT_FILE" ]; then
     python3 gen_input.py $FS_N $FS_M_FILE 0.0 1.0 "$INPUT_FILE" $FS_SEED
 fi
@@ -75,165 +65,70 @@ if [ ! -f "$INPUT_FILE_BIN" ]; then
 fi
 echo ""
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EXPERIMENT A: Dense M Sweep
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Run Padding Sweep ────────────────────────────────────────────────────────
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo " Experiment A: Dense M Sweep (threads=$EXP_A_THREADS, padding=$EXP_A_PADDING)"
+echo " Padding Sweep: M × padding_bytes × threads"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-echo "M,padding_bytes,threads,N,mean_sec,std_sec,spill_bytes,aligned" > "$CSV_A"
+echo "M,padding_bytes,threads,N,mean_sec,std_sec" > "$CSV_OUT"
 
 for m in $M_VALUES; do
-    export OMP_NUM_THREADS=$EXP_A_THREADS
+    stride_bytes=$(( m * 4 ))
+    spill=$(( stride_bytes % 64 ))
+    echo ""
+    echo "  ┌─ M=$m (stride=${stride_bytes}B, spill=${spill}B)"
 
-    echo -n "  M=$m: "
-    output=$(./false_sharing_exp "$INPUT_FILE_BIN" $EXP_A_PADDING $EXP_A_THREADS $NUM_RUNS $WARMUP $m 2>&1 > "$RESULT_DIR/out_fs_m${m}.dat")
-    timing_line=$(echo "$output" | grep "^FALSESHARE,")
-
-    mean=$(echo "$timing_line" | cut -d',' -f6)
-    std=$(echo "$timing_line" | cut -d',' -f7)
-    N_val=$(echo "$timing_line" | cut -d',' -f5)
-
-    # Calculate spill and alignment
-    spill=$(( (m * 4) % 64 ))
-    aligned="no"
-    if [ $spill -eq 0 ]; then aligned="yes"; fi
-
-    echo "mean=${mean}s std=${std}s spill=${spill}B aligned=${aligned}"
-    echo "${m},${EXP_A_PADDING},${EXP_A_THREADS},${N_val},${mean},${std},${spill},${aligned}" >> "$CSV_A"
-done
-echo ""
-
-# ══════════════════════════════════════════════════════════════════════════════
-# EXPERIMENT B: Paired Analysis (extracted from A)
-# ══════════════════════════════════════════════════════════════════════════════
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo " Experiment B: Paired Analysis (from Experiment A data)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-python3 - "$CSV_A" <<'PYEOF'
-import csv, sys
-
-rows = {int(r['M']): r for r in csv.DictReader(open(sys.argv[1]))}
-
-sub1 = [
-    (8, 9, "Minimal spill (+1 int)"),
-    (16, 17, "Minimal spill (+1 int)"),
-    (32, 33, "Minimal spill (+1 int)"),
-    (64, 65, "Minimal spill (+1 int)"),
-]
-
-sub2 = [
-    (8, 9, "Spill = 4B"),
-    (16, 18, "Spill = 8B"),
-    (32, 36, "Spill = 16B"),
-    (64, 72, "Spill = 32B"),
-]
-
-def print_sub(name, pairs):
-    print(f"\n  {name}")
-    print(f"  {'Pair':<6} {'Aligned':<10} {'Misaligned':<12} {'Time(A)':<12} {'Time(M)':<12} {'Penalty':<10} {'Note'}")
-    print("  " + "─" * 83)
-    for i, (aligned_m, misaligned_m, note) in enumerate(pairs, 1):
-        if aligned_m in rows and misaligned_m in rows:
-            ta = float(rows[aligned_m]['mean_sec'])
-            tm = float(rows[misaligned_m]['mean_sec'])
-            penalty = (tm - ta) / ta * 100 if ta > 0 else 0
-            print(f"    {i:<4} M={aligned_m:<6} M={misaligned_m:<8} {ta:<12.6f} {tm:<12.6f} {penalty:>+7.1f}%   {note}")
-        else:
-            missing = []
-            if aligned_m not in rows: missing.append(f"M={aligned_m}")
-            if misaligned_m not in rows: missing.append(f"M={misaligned_m}")
-            print(f"    {i:<4} M={aligned_m:<6} M={misaligned_m:<8} {'N/A':<12} {'N/A':<12} {'N/A':<10} {note} (missing: {', '.join(missing)})")
-
-print_sub("Sub-setting 1: Minimal spill (aligned vs aligned+1)", sub1)
-print_sub("Sub-setting 2: Increasing spill amount", sub2)
-print()
-PYEOF
-echo ""
-
-# ══════════════════════════════════════════════════════════════════════════════
-# EXPERIMENT C: Thread Count Scaling
-# ══════════════════════════════════════════════════════════════════════════════
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo " Experiment C: Thread Scaling (M=$EXP_C_M_ALIGNED vs M=$EXP_C_M_MISALIGNED, padding=$EXP_C_PADDING)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-echo "M,padding_bytes,threads,N,mean_sec,std_sec" > "$CSV_C"
-
-for m in $EXP_C_M_ALIGNED $EXP_C_M_MISALIGNED; do
-    echo "  M=$m:"
-    for threads in $EXP_C_THREADS; do
+    for threads in $THREAD_VALUES; do
+        echo "  │  threads=$threads"
         export OMP_NUM_THREADS=$threads
-        echo -n "    t=$threads: "
 
-        output=$(./false_sharing_exp "$INPUT_FILE_BIN" $EXP_C_PADDING $threads $NUM_RUNS $WARMUP $m 2>&1 > /dev/null)
-        timing_line=$(echo "$output" | grep "^FALSESHARE,")
-        mean=$(echo "$timing_line" | cut -d',' -f6)
-        std=$(echo "$timing_line" | cut -d',' -f7)
-        N_val=$(echo "$timing_line" | cut -d',' -f5)
+        for pad in $PADDING_VALUES; do
+            echo -n "  │    pad=${pad}B: "
 
-        echo "mean=${mean}s std=${std}s"
-        echo "${m},${EXP_C_PADDING},${threads},${N_val},${mean},${std}" >> "$CSV_C"
+            output=$(./false_sharing_exp "$INPUT_FILE_BIN" $pad $threads $NUM_RUNS $WARMUP $m 2>&1 > /dev/null)
+            timing_line=$(echo "$output" | grep "^FALSESHARE,")
+            mean=$(echo "$timing_line" | cut -d',' -f6)
+            std=$(echo "$timing_line" | cut -d',' -f7)
+            N_val=$(echo "$timing_line" | cut -d',' -f5)
+
+            echo "mean=${mean}s std=${std}s"
+            echo "${m},${pad},${threads},${N_val},${mean},${std}" >> "$CSV_OUT"
+        done
     done
+    echo "  └─"
 done
 echo ""
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EXPERIMENT D: Padding Threshold
-# ══════════════════════════════════════════════════════════════════════════════
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo " Experiment D: Padding Threshold (M=$EXP_D_M, threads=$EXP_D_THREADS)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-echo "M,padding_bytes,threads,N,mean_sec,std_sec" > "$CSV_D"
-
-export OMP_NUM_THREADS=$EXP_D_THREADS
-
-for pad in $EXP_D_PADDINGS; do
-    echo -n "  padding=${pad}B: "
-
-    output=$(./false_sharing_exp "$INPUT_FILE_BIN" $pad $EXP_D_THREADS $NUM_RUNS $WARMUP $EXP_D_M 2>&1 > /dev/null)
-    timing_line=$(echo "$output" | grep "^FALSESHARE,")
-    mean=$(echo "$timing_line" | cut -d',' -f6)
-    std=$(echo "$timing_line" | cut -d',' -f7)
-    N_val=$(echo "$timing_line" | cut -d',' -f5)
-
-    echo "mean=${mean}s std=${std}s"
-    echo "${EXP_D_M},${pad},${EXP_D_THREADS},${N_val},${mean},${std}" >> "$CSV_D"
-done
+# ── Summary ──────────────────────────────────────────────────────────────────
+echo "═══════════════════════════════════════════════════"
+echo " False Sharing Padding Sweep Complete"
+echo "═══════════════════════════════════════════════════"
+echo " Output: $CSV_OUT"
 echo ""
 
-# ── Final Summary ────────────────────────────────────────────────────────────
-echo "═══════════════════════════════════════════════════"
-echo " False Sharing Experiments Complete"
-echo "═══════════════════════════════════════════════════"
-echo " Input file:             $INPUT_FILE"
-echo " Exp A (dense sweep):    $CSV_A"
-echo " Exp C (thread scaling): $CSV_C"
-echo " Exp D (padding):        $CSV_D"
-echo ""
-echo " Key finding preview:"
-
-python3 - "$CSV_A" <<'PYEOF'
+python3 - "$CSV_OUT" <<'PYEOF'
 import csv, sys
 
 rows = list(csv.DictReader(open(sys.argv[1])))
-aligned = [r for r in rows if r['aligned'] == 'yes']
-misaligned = [r for r in rows if r['aligned'] == 'no']
 
-if aligned and misaligned:
-    avg_aligned = sum(float(r['mean_sec']) for r in aligned) / len(aligned)
-    avg_misaligned = sum(float(r['mean_sec']) for r in misaligned) / len(misaligned)
-    penalty = (avg_misaligned - avg_aligned) / avg_aligned * 100
-    print(f"   Avg aligned time:    {avg_aligned:.6f}s ({len(aligned)} configs)")
-    print(f"   Avg misaligned time: {avg_misaligned:.6f}s ({len(misaligned)} configs)")
-    print(f"   Average penalty:     {penalty:+.1f}%")
+print(" Summary by M value (threads=16):")
+print(" ─────────────────────────────────────────────────")
+
+for m_val in ['8', '33', '128']:
+    subset = [r for r in rows if r['M'] == m_val and r['threads'] == '16']
+    if not subset:
+        continue
+    t_nopad = float(subset[0]['mean_sec'])  # padding=0
+    t_maxpad = float(subset[-1]['mean_sec'])  # max padding
+    t_min = min(float(r['mean_sec']) for r in subset)
+    speedup = t_nopad / t_min if t_min > 0 else 0
+    print(f"   M={m_val:>3}: no-pad={t_nopad:.4f}s  best={t_min:.4f}s  speedup={speedup:.1f}x")
+
+print()
 PYEOF
 
 echo ""
 
-# ── Cleanup artifacts (keep CSVs and inputs for re-runs) ─────────────────────
+# ── Cleanup artifacts ────────────────────────────────────────────────────────
 echo "[CLEANUP] Removing output artifacts and binaries..."
 "$(dirname "$0")/cleanup.sh"
