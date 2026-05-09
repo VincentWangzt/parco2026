@@ -1,6 +1,6 @@
 CC       = g++ -std=c++11
 OMP_FLAG = -fopenmp
-OPT      = -O3 -march=native
+OPT      = -O3 -march=native -flto -fno-trapping-math -fno-math-errno
 
 # ── OpenMP 4.5+ array reduction detection ────────────────────────────────────
 # Try to compile a minimal snippet using reduction(+:arr[:n]).
@@ -22,10 +22,11 @@ endif
 SERIAL       = serial
 HISTOGRAM    = histogram_omp
 FAST         = histogram_fast
+FAST_ILP     = histogram_fast_ilp
 FAST_DIV     = histogram_fast_div
 FALSESHARE   = false_sharing_exp
 
-all: $(SERIAL) $(HISTOGRAM) $(FAST) $(FAST_DIV) $(FALSESHARE)
+all: $(SERIAL) $(HISTOGRAM) $(FAST) $(FAST_ILP) $(FAST_DIV) $(FALSESHARE)
 	@echo "[INFO] OpenMP 4.5+ array reduction: $(OMP45_TEST)"
 
 # Serial: NO -fopenmp, uses <chrono> for timing
@@ -38,6 +39,10 @@ histogram_omp: histogram_omp.cpp
 
 # Optimized fast version (reciprocal multiply)
 histogram_fast: histogram_fast.cpp
+	$(CC) $(OPT) $(OMP_FLAG) -o $@ $^ $(FLAGS)
+
+# Optimized fast version — baseline without ILP (for comparison)
+histogram_fast_ilp: histogram_fast_ilp.cpp
 	$(CC) $(OPT) $(OMP_FLAG) -o $@ $^ $(FLAGS)
 
 # Optimized fast version (standard division)
@@ -73,6 +78,12 @@ check_fast: $(FAST)
 	python3 check.py input1.dat output_fast_check.dat
 	@rm -f output_fast_check.dat
 
+check_fast_ilp: $(FAST_ILP)
+	@echo "=== Checking histogram_fast_ilp ==="
+	OMP_NUM_THREADS=4 ./$(FAST_ILP) input1.dat output_fast_ilp_check.dat 2>/dev/null
+	python3 check.py input1.dat output_fast_ilp_check.dat
+	@rm -f output_fast_ilp_check.dat
+
 check_fast_div: $(FAST_DIV)
 	@echo "=== Checking histogram_fast_div ==="
 	OMP_NUM_THREADS=4 ./$(FAST_DIV) input1.dat output_fast_div_check.dat 2>/dev/null
@@ -80,7 +91,7 @@ check_fast_div: $(FAST_DIV)
 	@rm -f output_fast_div_check.dat
 
 clean:
-	rm -f $(SERIAL) $(HISTOGRAM) $(FAST) $(FAST_DIV) $(FALSESHARE) *.o
+	rm -f $(SERIAL) $(HISTOGRAM) $(FAST) $(FAST_ILP) $(FAST_DIV) $(FALSESHARE) *.o
 	rm -f output*.dat *.bin
 	rm -rf results/
 
@@ -90,4 +101,4 @@ clean-bench:
 clean-all:
 	./cleanup.sh --all
 
-.PHONY: all clean clean-bench clean-all inputs inputs-bin check check_fast check_fast_div
+.PHONY: all clean clean-bench clean-all inputs inputs-bin check check_fast check_fast_ilp check_fast_div

@@ -1,9 +1,9 @@
 /*
  * Foundations of Parallel Computing II, Spring 2026.
  * Instructor: Chao Yang @ Peking University.
- * Optimized parallel histogram with dual ILP optimization.
+ * Optimized parallel histogram — initial version for iterative refinement.
  *
- * Usage: ./histogram_fast <input> <output> [num_runs] [warmup_runs]
+ * Usage: ./histogram_fast <input> <output> [num_runs] [warmup_runs] [num_runs] [warmup_runs]
  *
  * Optimizations applied:
  * 1. Thread-private histograms with cache-line padding
@@ -11,7 +11,6 @@
  * 3. Reciprocal multiply (avoid division in hot loop)
  * 4. schedule(static) for spatial locality
  * 5. Parallel merge phase
- * 6. Dual private histograms per thread (ILP) — breaks RAW dependency chain
  *
  * Timing output (stderr):
  *   TIMING,fast,<threads>,<N>,<M>,<mean_sec>,<std_sec>
@@ -34,7 +33,6 @@ static const int CACHE_LINE = 64;
 static const int INTS_PER_LINE = CACHE_LINE / sizeof(int);  // 16
 static int NUM_RUNS = 5;
 static int WARMUP_RUNS = 2;
-static const int NREP = 2;  // dual histograms for ILP
 // ────────────────────────────────────────────────────────────────────────────
 
 static int N, M;
@@ -94,50 +92,30 @@ static void compute_histogram() {
     const int padded_M = ((Mlocal + INTS_PER_LINE - 1) / INTS_PER_LINE) * INTS_PER_LINE;
     const int stride = padded_M + INTS_PER_LINE;  // +1 cache line between threads
 
-    // Allocate NREP histogram copies per thread for ILP
-    int* local_hists = aligned_alloc_array<int>(nthreads * NREP * stride);
-    memset(local_hists, 0, nthreads * NREP * stride * sizeof(int));
+    int* local_hists = aligned_alloc_array<int>(nthreads * stride);
+    memset(local_hists, 0, nthreads * stride * sizeof(int));
 
     #pragma omp parallel
     {
         const int tid = omp_get_thread_num();
-        // Two histogram copies per thread to break RAW dependency chain
-        int* __restrict__ hist0 = local_hists + (tid * NREP + 0) * stride;
-        int* __restrict__ hist1 = local_hists + (tid * NREP + 1) * stride;
+        int* __restrict__ my_hist = local_hists + tid * stride;
 
-        // Alternate between hist0 and hist1 on consecutive elements.
-        // This breaks the Read-After-Write dependency: the CPU can pipeline
-        // the increment to hist1 while hist0's increment is still in flight.
         #pragma omp for schedule(static)
-        for (int i = 0; i < N - 1; i += 2) {
-            int bin0 = (int)((data_arr[i] - dmin) * inv_bin_width);
-            if (bin0 < 0) bin0 = 0;
-            if (bin0 >= Mlocal) bin0 = Mlocal - 1;
-            hist0[bin0]++;
-
-            int bin1 = (int)((data_arr[i + 1] - dmin) * inv_bin_width);
-            if (bin1 < 0) bin1 = 0;
-            if (bin1 >= Mlocal) bin1 = Mlocal - 1;
-            hist1[bin1]++;
-        }
-
-        // Handle the last element if N is odd
-        #pragma omp single
-        if (N % 2 != 0) {
-            int bin = (int)((data_arr[N - 1] - dmin) * inv_bin_width);
+        for (int i = 0; i < N; ++i) {
+            int bin = (int)((data_arr[i] - dmin) * inv_bin_width);
+            // Clamp to valid range
             if (bin < 0) bin = 0;
             if (bin >= Mlocal) bin = Mlocal - 1;
-            hist0[bin]++;
+            my_hist[bin]++;
         }
     }
 
-    // Parallel merge: accumulate all thread-local histograms into hist_arr
+    // Parallel merge
     #pragma omp parallel for schedule(static)
     for (int b = 0; b < Mlocal; ++b) {
         int sum = 0;
         for (int t = 0; t < nthreads; ++t)
-            for (int r = 0; r < NREP; ++r)
-                sum += local_hists[(t * NREP + r) * stride + b];
+            sum += local_hists[t * stride + b];
         hist_arr[b] = sum;
     }
 

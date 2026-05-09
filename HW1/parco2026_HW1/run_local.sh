@@ -127,8 +127,6 @@ SYSINFO_FILE="$RESULT_DIR/sysinfo_$(date +%Y%m%d_%H%M%S).txt"
 echo "[INFO] System info saved to: $SYSINFO_FILE"
 echo ""
 
-exit 0
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ENVIRONMENT SETUP
 # ═══════════════════════════════════════════════════════════════════════════════
