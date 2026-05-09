@@ -25,6 +25,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 #include <omp.h>
 
 using namespace std;
@@ -34,14 +35,34 @@ static double min_val, max_val;
 static vector<double> data;
 static vector<int> hist;
 
+// Utility: check if a filename ends with a given suffix
+static bool ends_with(const string& s, const string& suffix) {
+    if (s.size() < suffix.size()) return false;
+    return s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 void read_inputs(const string& filename) {
-    ifstream f(filename);
-    if (!f.is_open()) { cerr << "ERROR: Cannot open " << filename << endl; abort(); }
-    f >> N >> M >> min_val >> max_val;
-    data.resize(N);
-    for (int i = 0; i < N; ++i)
-        f >> data[i];
-    f.close();
+    if (ends_with(filename, ".bin")) {
+        // Binary format: [N:i32][M:i32][min_val:f64][max_val:f64][data: N×f64]
+        FILE* f = fopen(filename.c_str(), "rb");
+        if (!f) { cerr << "ERROR: Cannot open " << filename << endl; abort(); }
+        fread(&N, sizeof(int), 1, f);
+        fread(&M, sizeof(int), 1, f);
+        fread(&min_val, sizeof(double), 1, f);
+        fread(&max_val, sizeof(double), 1, f);
+        data.resize(N);
+        fread(data.data(), sizeof(double), N, f);
+        fclose(f);
+    } else {
+        // Text format
+        ifstream f(filename);
+        if (!f.is_open()) { cerr << "ERROR: Cannot open " << filename << endl; abort(); }
+        f >> N >> M >> min_val >> max_val;
+        data.resize(N);
+        for (int i = 0; i < N; ++i)
+            f >> data[i];
+        f.close();
+    }
     hist.resize(M, 0);
 }
 

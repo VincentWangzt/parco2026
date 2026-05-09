@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 #include <omp.h>
 
 using namespace std;
@@ -36,33 +37,62 @@ namespace utils {
     vector<double> data;
     vector<int>    hist;
 
+    // Utility: check if a filename ends with a given suffix
+    static bool ends_with(const string& s, const string& suffix) {
+        if (s.size() < suffix.size()) return false;
+        return s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+    }
+
     void abort_with_error_message(const string& msg) {
         cerr << msg << endl;
         abort();
     }
 
     void read_inputs(const string& filename) {
-        ifstream f(filename);
-        if (!f.is_open())
-            abort_with_error_message("ERROR: Unable to open input file.");
-
-        f >> N >> M >> min_val >> max_val;
-        data.resize(N);
-        for (int i = 0; i < N; ++i)
-            f >> data[i];
-        f.close();
+        if (ends_with(filename, ".bin")) {
+            // Binary format: [N:i32][M:i32][min_val:f64][max_val:f64][data: N×f64]
+            FILE* f = fopen(filename.c_str(), "rb");
+            if (!f)
+                abort_with_error_message("ERROR: Unable to open input file.");
+            fread(&N, sizeof(int), 1, f);
+            fread(&M, sizeof(int), 1, f);
+            fread(&min_val, sizeof(double), 1, f);
+            fread(&max_val, sizeof(double), 1, f);
+            data.resize(N);
+            fread(data.data(), sizeof(double), N, f);
+            fclose(f);
+        } else {
+            // Text format: "N M min_val max_val\n" followed by N doubles
+            ifstream f(filename);
+            if (!f.is_open())
+                abort_with_error_message("ERROR: Unable to open input file.");
+            f >> N >> M >> min_val >> max_val;
+            data.resize(N);
+            for (int i = 0; i < N; ++i)
+                f >> data[i];
+            f.close();
+        }
 
         hist.resize(M, 0);
     }
 
     void write_outputs(const string& filename) {
-        ofstream f(filename);
-        if (!f.is_open())
-            abort_with_error_message("ERROR: Unable to open output file.");
-
-        for (int i = 0; i < M; ++i)
-            f << hist[i] << "\n";
-        f.close();
+        if (ends_with(filename, ".bin")) {
+            // Binary format: [hist: M × int32]
+            FILE* f = fopen(filename.c_str(), "wb");
+            if (!f)
+                abort_with_error_message("ERROR: Unable to open output file.");
+            fwrite(hist.data(), sizeof(int), M, f);
+            fclose(f);
+        } else {
+            // Text format: one integer per line
+            ofstream f(filename);
+            if (!f.is_open())
+                abort_with_error_message("ERROR: Unable to open output file.");
+            for (int i = 0; i < M; ++i)
+                f << hist[i] << "\n";
+            f.close();
+        }
     }
 }
 

@@ -27,6 +27,7 @@ FS_M_FILE=256          # M stored in the input file (arbitrary, will be overridd
 
 # Single input file for all experiments
 INPUT_FILE="$RESULT_DIR/input_fs.dat"
+INPUT_FILE_BIN="$RESULT_DIR/input_fs.bin"
 
 # Experiment A: Dense M sweep
 M_VALUES="8 9 12 16 17 18 20 24 32 33 36 48 64 65 72"
@@ -66,6 +67,12 @@ if [ ! -f "$INPUT_FILE" ]; then
     python3 gen_input.py $FS_N $FS_M_FILE 0.0 1.0 "$INPUT_FILE" $FS_SEED
 fi
 echo "  -> $INPUT_FILE"
+
+# Convert to binary for faster I/O
+if [ ! -f "$INPUT_FILE_BIN" ]; then
+    echo "[CONVERT] $INPUT_FILE -> $INPUT_FILE_BIN"
+    python3 convert_to_binary.py "$INPUT_FILE" "$INPUT_FILE_BIN"
+fi
 echo ""
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -81,7 +88,7 @@ for m in $M_VALUES; do
     export OMP_NUM_THREADS=$EXP_A_THREADS
 
     echo -n "  M=$m: "
-    output=$(./false_sharing_exp "$INPUT_FILE" $EXP_A_PADDING $EXP_A_THREADS $NUM_RUNS $WARMUP $m 2>&1 > "$RESULT_DIR/out_fs_m${m}.dat")
+    output=$(./false_sharing_exp "$INPUT_FILE_BIN" $EXP_A_PADDING $EXP_A_THREADS $NUM_RUNS $WARMUP $m 2>&1 > "$RESULT_DIR/out_fs_m${m}.dat")
     timing_line=$(echo "$output" | grep "^FALSESHARE,")
 
     mean=$(echo "$timing_line" | cut -d',' -f6)
@@ -161,7 +168,7 @@ for m in $EXP_C_M_ALIGNED $EXP_C_M_MISALIGNED; do
         export OMP_NUM_THREADS=$threads
         echo -n "    t=$threads: "
 
-        output=$(./false_sharing_exp "$INPUT_FILE" $EXP_C_PADDING $threads $NUM_RUNS $WARMUP $m 2>&1 > /dev/null)
+        output=$(./false_sharing_exp "$INPUT_FILE_BIN" $EXP_C_PADDING $threads $NUM_RUNS $WARMUP $m 2>&1 > /dev/null)
         timing_line=$(echo "$output" | grep "^FALSESHARE,")
         mean=$(echo "$timing_line" | cut -d',' -f6)
         std=$(echo "$timing_line" | cut -d',' -f7)
@@ -187,7 +194,7 @@ export OMP_NUM_THREADS=$EXP_D_THREADS
 for pad in $EXP_D_PADDINGS; do
     echo -n "  padding=${pad}B: "
 
-    output=$(./false_sharing_exp "$INPUT_FILE" $pad $EXP_D_THREADS $NUM_RUNS $WARMUP $EXP_D_M 2>&1 > /dev/null)
+    output=$(./false_sharing_exp "$INPUT_FILE_BIN" $pad $EXP_D_THREADS $NUM_RUNS $WARMUP $EXP_D_M 2>&1 > /dev/null)
     timing_line=$(echo "$output" | grep "^FALSESHARE,")
     mean=$(echo "$timing_line" | cut -d',' -f6)
     std=$(echo "$timing_line" | cut -d',' -f7)

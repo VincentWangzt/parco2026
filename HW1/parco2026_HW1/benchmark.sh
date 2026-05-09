@@ -40,6 +40,15 @@ for inp in $INPUTS; do
     fi
 done
 
+# Convert inputs to binary for faster I/O
+for inp in $INPUTS; do
+    bin_inp="${inp%.dat}.bin"
+    if [ ! -f "$bin_inp" ]; then
+        echo "[CONVERT] $inp -> $bin_inp"
+        python3 convert_to_binary.py "$inp" "$bin_inp"
+    fi
+done
+
 # CSV header
 echo "strategy,threads,N,M,mean_sec,std_sec,correct" > "$CSV"
 
@@ -47,17 +56,22 @@ echo "strategy,threads,N,M,mean_sec,std_sec,correct" > "$CSV"
 echo "[SERIAL BASELINE]"
 for input in $INPUTS; do
     echo -n "  serial / $input: "
-    timing_line=$(./serial "$input" "$RESULT_DIR/out_serial_$(basename $input .dat).dat" 2>&1 | grep "^TIMING,")
+    bin_input="${input%.dat}.bin"
+    serial_out="$RESULT_DIR/out_serial_$(basename $input .dat).bin"
+    timing_line=$(./serial "$bin_input" "$serial_out" 2>&1 | grep "^TIMING,")
     mean=$(echo "$timing_line" | cut -d',' -f6)
     std=$(echo "$timing_line" | cut -d',' -f7)
     N_val=$(echo "$timing_line" | cut -d',' -f4)
     M_val=$(echo "$timing_line" | cut -d',' -f5)
 
-    # Verify
+    # Verify via check.py (convert to text only here, for the baseline)
+    serial_out_txt="$RESULT_DIR/out_serial_$(basename $input .dat).dat"
+    python3 convert_to_binary.py --reverse "$serial_out" "$serial_out_txt"
     correct="yes"
-    if ! python3 check.py "$input" "$RESULT_DIR/out_serial_$(basename $input .dat).dat" 2>&1 | grep -q "CORRECT"; then
+    if ! python3 check.py "$input" "$serial_out_txt" 2>&1 | grep -q "CORRECT"; then
         correct="no"
     fi
+    rm -f "$serial_out_txt"
     echo "mean=${mean}s std=${std}s correct=${correct}"
     echo "serial,1,${N_val},${M_val},${mean},${std},${correct}" >> "$CSV"
 done
@@ -66,6 +80,7 @@ echo ""
 # ── Strategy sweeps ──────────────────────────────────────────────────────────
 for input in $INPUTS; do
     echo "[SWEEP] $input"
+    bin_input="${input%.dat}.bin"
     for strategy in $STRATEGIES; do
         for threads in $THREAD_COUNTS; do
             # Serial strategy only runs with 1 thread (already done above from serial binary)
@@ -84,23 +99,29 @@ for input in $INPUTS; do
             fi
 
             export OMP_NUM_THREADS=$threads
-            output_file="$RESULT_DIR/out_${strategy}_t${threads}_$(basename $input .dat).dat"
+            output_file="$RESULT_DIR/out_${strategy}_t${threads}_$(basename $input .dat).bin"
 
             echo -n "  $strategy / t=$threads: "
 
-            timing_line=$(./histogram_omp "$strategy" "$input" "$output_file" $NUM_RUNS $WARMUP 2>&1 | grep "^TIMING,")
+            timing_line=$(./histogram_omp "$strategy" "$bin_input" "$output_file" $NUM_RUNS $WARMUP 2>&1 | grep "^TIMING,")
             mean=$(echo "$timing_line" | cut -d',' -f6)
             std=$(echo "$timing_line" | cut -d',' -f7)
             N_val=$(echo "$timing_line" | cut -d',' -f4)
             M_val=$(echo "$timing_line" | cut -d',' -f5)
 
-            # Verify correctness: skip python if output matches serial exactly
-            serial_ref="$RESULT_DIR/out_serial_$(basename $input .dat).dat"
+            # Verify correctness: compare binary outputs directly, only invoke check.py on mismatch
+            serial_ref="$RESULT_DIR/out_serial_$(basename $input .dat).bin"
             correct="yes"
             if cmp -s "$output_file" "$serial_ref"; then
                 :  # byte-identical to verified serial output
-            elif ! python3 check.py "$input" "$output_file" 2>&1 | grep -q "CORRECT"; then
-                correct="no"
+            else
+                # Convert to text and run check.py
+                output_file_txt="${output_file%.bin}.dat"
+                python3 convert_to_binary.py --reverse "$output_file" "$output_file_txt"
+                if ! python3 check.py "$input" "$output_file_txt" 2>&1 | grep -q "CORRECT"; then
+                    correct="no"
+                fi
+                rm -f "$output_file_txt"
             fi
 
             echo "mean=${mean}s std=${std}s correct=${correct}"
@@ -112,23 +133,29 @@ for input in $INPUTS; do
     echo "  [FAST]"
     for threads in $THREAD_COUNTS; do
         export OMP_NUM_THREADS=$threads
-        output_file="$RESULT_DIR/out_fast_t${threads}_$(basename $input .dat).dat"
+        output_file="$RESULT_DIR/out_fast_t${threads}_$(basename $input .dat).bin"
 
         echo -n "  fast / t=$threads: "
 
-        timing_line=$(./histogram_fast "$input" "$output_file" 2>&1 | grep "^TIMING,")
+        timing_line=$(./histogram_fast "$bin_input" "$output_file" 2>&1 | grep "^TIMING,")
         mean=$(echo "$timing_line" | cut -d',' -f6)
         std=$(echo "$timing_line" | cut -d',' -f7)
         N_val=$(echo "$timing_line" | cut -d',' -f4)
         M_val=$(echo "$timing_line" | cut -d',' -f5)
 
-        # Verify correctness: skip python if output matches serial exactly
-        serial_ref="$RESULT_DIR/out_serial_$(basename $input .dat).dat"
+        # Verify correctness: compare binary outputs directly, only invoke check.py on mismatch
+        serial_ref="$RESULT_DIR/out_serial_$(basename $input .dat).bin"
         correct="yes"
         if cmp -s "$output_file" "$serial_ref"; then
             :  # byte-identical to verified serial output
-        elif ! python3 check.py "$input" "$output_file" 2>&1 | grep -q "CORRECT"; then
-            correct="no"
+        else
+            # Convert to text and run check.py
+            output_file_txt="${output_file%.bin}.dat"
+            python3 convert_to_binary.py --reverse "$output_file" "$output_file_txt"
+            if ! python3 check.py "$input" "$output_file_txt" 2>&1 | grep -q "CORRECT"; then
+                correct="no"
+            fi
+            rm -f "$output_file_txt"
         fi
 
         echo "mean=${mean}s std=${std}s correct=${correct}"

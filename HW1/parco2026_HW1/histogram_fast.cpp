@@ -40,6 +40,13 @@ static double min_val, max_val;
 static double* data_arr = nullptr;
 static int* hist_arr = nullptr;
 
+// Utility: check if a filename ends with a given suffix
+static bool ends_with(const char* s, const char* suffix) {
+    size_t slen = strlen(s), sufflen = strlen(suffix);
+    if (slen < sufflen) return false;
+    return strcmp(s + slen - sufflen, suffix) == 0;
+}
+
 // Aligned allocation
 template<typename T>
 static T* aligned_alloc_array(size_t count) {
@@ -49,14 +56,27 @@ static T* aligned_alloc_array(size_t count) {
 }
 
 static void read_inputs(const char* filename) {
-    FILE* f = fopen(filename, "r");
-    if (!f) { fprintf(stderr, "ERROR: Cannot open %s\n", filename); abort(); }
-
-    fscanf(f, "%d %d %lf %lf", &N, &M, &min_val, &max_val);
-    data_arr = aligned_alloc_array<double>(N);
-    for (int i = 0; i < N; ++i)
-        fscanf(f, "%lf", &data_arr[i]);
-    fclose(f);
+    if (ends_with(filename, ".bin")) {
+        // Binary format: [N:i32][M:i32][min_val:f64][max_val:f64][data: N×f64]
+        FILE* f = fopen(filename, "rb");
+        if (!f) { fprintf(stderr, "ERROR: Cannot open %s\n", filename); abort(); }
+        fread(&N, sizeof(int), 1, f);
+        fread(&M, sizeof(int), 1, f);
+        fread(&min_val, sizeof(double), 1, f);
+        fread(&max_val, sizeof(double), 1, f);
+        data_arr = aligned_alloc_array<double>(N);
+        fread(data_arr, sizeof(double), N, f);
+        fclose(f);
+    } else {
+        // Text format: "N M min_val max_val\n" followed by N doubles
+        FILE* f = fopen(filename, "r");
+        if (!f) { fprintf(stderr, "ERROR: Cannot open %s\n", filename); abort(); }
+        fscanf(f, "%d %d %lf %lf", &N, &M, &min_val, &max_val);
+        data_arr = aligned_alloc_array<double>(N);
+        for (int i = 0; i < N; ++i)
+            fscanf(f, "%lf", &data_arr[i]);
+        fclose(f);
+    }
 
     hist_arr = aligned_alloc_array<int>(M);
     memset(hist_arr, 0, M * sizeof(int));
@@ -103,11 +123,20 @@ static void compute_histogram() {
 }
 
 static void write_outputs(const char* filename) {
-    FILE* f = fopen(filename, "w");
-    if (!f) { fprintf(stderr, "ERROR: Cannot open %s\n", filename); abort(); }
-    for (int i = 0; i < M; ++i)
-        fprintf(f, "%d\n", hist_arr[i]);
-    fclose(f);
+    if (ends_with(filename, ".bin")) {
+        // Binary format: [hist: M × int32]
+        FILE* f = fopen(filename, "wb");
+        if (!f) { fprintf(stderr, "ERROR: Cannot open %s\n", filename); abort(); }
+        fwrite(hist_arr, sizeof(int), M, f);
+        fclose(f);
+    } else {
+        // Text format: one integer per line
+        FILE* f = fopen(filename, "w");
+        if (!f) { fprintf(stderr, "ERROR: Cannot open %s\n", filename); abort(); }
+        for (int i = 0; i < M; ++i)
+            fprintf(f, "%d\n", hist_arr[i]);
+        fclose(f);
+    }
 }
 
 int main(int argc, char* argv[]) {

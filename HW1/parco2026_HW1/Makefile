@@ -30,6 +30,11 @@ false_sharing_exp: false_sharing_exp.cpp
 inputs:
 	python3 gen_input.py
 
+# Generate binary input files (text -> binary conversion)
+inputs-bin: inputs
+	python3 convert_to_binary.py input1.dat input1.bin
+	python3 convert_to_binary.py input2.dat input2.bin
+
 # Quick correctness check
 check: $(HISTOGRAM)
 	@echo "=== Checking all strategies ==="
@@ -48,7 +53,7 @@ check_fast: $(FAST)
 
 clean:
 	rm -f $(SERIAL) $(HISTOGRAM) $(FAST) $(FALSESHARE) *.o
-	rm -f output*.dat
+	rm -f output*.dat *.bin
 	rm -rf results/
 
 clean-bench:
@@ -57,4 +62,4 @@ clean-bench:
 clean-all:
 	./cleanup.sh --all
 
-.PHONY: all clean clean-bench clean-all inputs check check_fast
+.PHONY: all clean clean-bench clean-all inputs inputs-bin check check_fast
