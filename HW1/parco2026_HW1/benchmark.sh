@@ -107,7 +107,7 @@ for input in $INPUTS; do
 
             # Cap thread count for atomic/critical (they scale negatively)
             if [ "$strategy" = "atomic" ] || [ "$strategy" = "critical" ]; then
-                if [ "$threads" -gt 4 ]; then
+                if [ "$threads" -gt 2 ]; then
                     continue
                 fi
             fi

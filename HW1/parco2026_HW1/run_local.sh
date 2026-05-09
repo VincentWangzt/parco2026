@@ -132,7 +132,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Thread affinity for consistent results (mirrors run.slurm)
-export OMP_PROC_BIND=close
+export OMP_PROC_BIND=spread
 export OMP_PLACES=cores
 
 # Generate inputs if needed
