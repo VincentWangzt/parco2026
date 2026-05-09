@@ -13,7 +13,8 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 CSV="$RESULT_DIR/benchmark_${TIMESTAMP}.csv"
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-STRATEGIES="serial atomic critical private padded reduction"
+# STRATEGIES="serial atomic critical private padded reduction"
+STRATEGIES="serial atomic critical private padded"
 THREAD_COUNTS="1 2 4 8 16"
 INPUTS="input1.dat input2.dat"
 NUM_RUNS=20

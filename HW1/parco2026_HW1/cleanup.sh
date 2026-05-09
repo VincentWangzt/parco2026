@@ -42,7 +42,8 @@ rm -f output*.dat
 rm -f output*.bin
 rm -f results/out_*.dat
 rm -f results/out_*.bin
-
+rm -f results_slurm/out_*.dat
+rm -f results_slurm/out_*.bin
 
 # ── Generated input data ─────────────────────────────────────────────────────
 if [ "$KEEP_INPUTS" = false ]; then
@@ -51,6 +52,8 @@ if [ "$KEEP_INPUTS" = false ]; then
     rm -f input1.bin input2.bin
     rm -f results/input_fs.dat
     rm -f results/input_fs.bin
+    rm -f results_slurm/input_fs.dat
+    rm -f results_slurm/input_fs.bin
 fi
 
 # ── CSV result files (only with --all) ───────────────────────────────────────
@@ -58,11 +61,17 @@ if [ "$REMOVE_CSV" = true ]; then
     echo "[CLEANUP] Removing CSV result files..."
     rm -f results/benchmark_*.csv
     rm -f results/fs_exp*.csv
+    rm -f results_slurm/benchmark_*.csv
+    rm -f results_slurm/fs_exp*.csv
 fi
 
 # ── Remove results/ dir if empty ─────────────────────────────────────────────
 if [ -d results ] && [ -z "$(ls -A results 2>/dev/null)" ]; then
     rmdir results
+fi
+
+if [ -d results_slurm ] && [ -z "$(ls -A results 2>/dev/null)" ]; then
+    rmdir results_slurm
 fi
 
 echo "[CLEANUP] Done."

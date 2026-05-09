@@ -13,4 +13,4 @@ job_*.out
 
 # Temporary results (keep results/ directory for committed baselines)
 results_test/
-results_slurm/
+# results_slurm/

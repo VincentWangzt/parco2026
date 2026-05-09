@@ -204,6 +204,7 @@ void hist_padded() {
 }
 
 // Strategy 6: OpenMP 4.5+ array section reduction (compiler-managed)
+/*
 void hist_reduction() {
     double bin_width = (utils::max_val - utils::min_val) / utils::M;
     int M = utils::M;
@@ -217,6 +218,7 @@ void hist_reduction() {
         hist_arr[bin]++;
     }
 }
+*/
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Strategy Registry
@@ -235,7 +237,7 @@ static StrategyEntry strategies[] = {
     {"critical",  hist_critical},
     {"private",   hist_private},
     {"padded",    hist_padded},
-    {"reduction", hist_reduction},
+//    {"reduction", hist_reduction},
 };
 static const int NUM_STRATEGIES = sizeof(strategies) / sizeof(strategies[0]);
 

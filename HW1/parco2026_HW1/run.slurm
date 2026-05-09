@@ -1,17 +1,17 @@
 #!/bin/bash
-#SBATCH -o job_%j_%N.out
-#SBATCH -p cpu
+#SBATCH -o job_%j.out
+#SBATCH -p compute
 #SBATCH -J parco_hw1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
-#SBATCH -t 15:00
-#SBATCH --exclusive
+#SBATCH -t 00:30:00
 
 echo "═══════════════════════════════════════════════════"
-echo " PARCO HW1 — Job $SLURM_JOB_ID on $(hostname)"
+echo " PARCO HW1 — Job $CRANE_JOB_ID on $(hostname)"
 echo " Date: $(date)"
 echo " CPUs: $SLURM_CPUS_PER_TASK"
+echo " Mem:  $CRANE_MEM_PER_NODE"
 echo "═══════════════════════════════════════════════════"
 echo ""
 
