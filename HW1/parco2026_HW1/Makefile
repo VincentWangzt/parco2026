@@ -51,4 +51,10 @@ clean:
 	rm -f output*.dat
 	rm -rf results/
 
-.PHONY: all clean inputs check check_fast
+clean-bench:
+	./cleanup.sh
+
+clean-all:
+	./cleanup.sh --all
+
+.PHONY: all clean clean-bench clean-all inputs check check_fast

@@ -94,9 +94,12 @@ for input in $INPUTS; do
             N_val=$(echo "$timing_line" | cut -d',' -f4)
             M_val=$(echo "$timing_line" | cut -d',' -f5)
 
-            # Verify correctness
+            # Verify correctness: skip python if output matches serial exactly
+            serial_ref="$RESULT_DIR/out_serial_$(basename $input .dat).dat"
             correct="yes"
-            if ! python3 check.py "$input" "$output_file" 2>&1 | grep -q "CORRECT"; then
+            if cmp -s "$output_file" "$serial_ref"; then
+                :  # byte-identical to verified serial output
+            elif ! python3 check.py "$input" "$output_file" 2>&1 | grep -q "CORRECT"; then
                 correct="no"
             fi
 
@@ -119,8 +122,12 @@ for input in $INPUTS; do
         N_val=$(echo "$timing_line" | cut -d',' -f4)
         M_val=$(echo "$timing_line" | cut -d',' -f5)
 
+        # Verify correctness: skip python if output matches serial exactly
+        serial_ref="$RESULT_DIR/out_serial_$(basename $input .dat).dat"
         correct="yes"
-        if ! python3 check.py "$input" "$output_file" 2>&1 | grep -q "CORRECT"; then
+        if cmp -s "$output_file" "$serial_ref"; then
+            :  # byte-identical to verified serial output
+        elif ! python3 check.py "$input" "$output_file" 2>&1 | grep -q "CORRECT"; then
             correct="no"
         fi
 
@@ -159,3 +166,9 @@ PYEOF
 
 echo ""
 echo "Results saved to: $CSV"
+echo ""
+
+# ── Cleanup artifacts (keep CSVs and inputs for re-runs) ─────────────────────
+echo "[CLEANUP] Removing output artifacts and binaries..."
+"$(dirname "$0")/cleanup.sh"
+echo ""

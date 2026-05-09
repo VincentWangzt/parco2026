@@ -18,13 +18,13 @@ CSV_C="$RESULT_DIR/fs_expC_threads_${TIMESTAMP}.csv"
 CSV_D="$RESULT_DIR/fs_expD_padding_${TIMESTAMP}.csv"
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-# Use N=10M for quick turnaround, uniform [0,1)
-FS_N=10000000
+# Use N=100M, uniform [0,1)
+FS_N=100000000
 FS_SEED=42
 
 # Experiment A: Dense M sweep
 M_VALUES="8 9 12 16 17 18 20 24 32 33 36 48 64 65 72"
-EXP_A_THREADS=4
+EXP_A_THREADS=16
 EXP_A_PADDING=0
 
 # Experiment C: Thread scaling
@@ -35,7 +35,7 @@ EXP_C_PADDING=0
 
 # Experiment D: Padding threshold
 EXP_D_M=33
-EXP_D_THREADS=4
+EXP_D_THREADS=16
 EXP_D_PADDINGS="0 4 8 16 32 64 128"
 
 NUM_RUNS=5
@@ -222,3 +222,9 @@ if aligned and misaligned:
     print(f"   Avg misaligned time: {avg_misaligned:.6f}s ({len(misaligned)} configs)")
     print(f"   Average penalty:     {penalty:+.1f}%")
 PYEOF
+
+echo ""
+
+# ── Cleanup artifacts (keep CSVs and inputs for re-runs) ─────────────────────
+echo "[CLEANUP] Removing output artifacts and binaries..."
+"$(dirname "$0")/cleanup.sh"
