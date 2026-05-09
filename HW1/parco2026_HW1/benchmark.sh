@@ -151,7 +151,7 @@ for input in $INPUTS; do
 
         echo -n "  fast / t=$threads: "
 
-        timing_line=$(./histogram_fast "$bin_input" "$output_file" 2>&1 | grep "^TIMING,")
+        timing_line=$(./histogram_fast "$bin_input" "$output_file" $NUM_RUNS $WARMUP 2>&1 | grep "^TIMING,")
         mean=$(echo "$timing_line" | cut -d',' -f6)
         std=$(echo "$timing_line" | cut -d',' -f7)
         N_val=$(echo "$timing_line" | cut -d',' -f4)
@@ -184,7 +184,7 @@ for input in $INPUTS; do
 
         echo -n "  fast_div / t=$threads: "
 
-        timing_line=$(./histogram_fast_div "$bin_input" "$output_file" 2>&1 | grep "^TIMING,")
+        timing_line=$(./histogram_fast_div "$bin_input" "$output_file" $NUM_RUNS $WARMUP 2>&1 | grep "^TIMING,")
         mean=$(echo "$timing_line" | cut -d',' -f6)
         std=$(echo "$timing_line" | cut -d',' -f7)
         N_val=$(echo "$timing_line" | cut -d',' -f4)

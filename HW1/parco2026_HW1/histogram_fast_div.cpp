@@ -3,7 +3,7 @@
  * Instructor: Chao Yang @ Peking University.
  * Optimized parallel histogram — standard division variant.
  *
- * Usage: ./histogram_fast_div <input> <output>
+ * Usage: ./histogram_fast_div <input> <output> [num_runs] [warmup_runs]
  *
  * Optimizations applied:
  * 1. Thread-private histograms with cache-line padding
@@ -31,8 +31,8 @@ using namespace std;
 // --- Configuration ----------------------------------------------------------
 static const int CACHE_LINE = 64;
 static const int INTS_PER_LINE = CACHE_LINE / sizeof(int);  // 16
-static const int NUM_RUNS = 5;
-static const int WARMUP_RUNS = 2;
+static int NUM_RUNS = 5;
+static int WARMUP_RUNS = 2;
 // ----------------------------------------------------------------------------
 
 static int N, M;
@@ -141,9 +141,12 @@ static void write_outputs(const char* filename) {
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "Usage: ./histogram_fast_div <input> <output>\n");
+        fprintf(stderr, "Usage: ./histogram_fast_div <input> <output> [num_runs] [warmup_runs]\n");
         return 1;
     }
+
+    if (argc >= 4) NUM_RUNS = atoi(argv[3]);
+    if (argc >= 5) WARMUP_RUNS = atoi(argv[4]);
 
     read_inputs(argv[1]);
 
@@ -154,7 +157,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Timed runs
-    double times[NUM_RUNS];
+    vector<double> times(NUM_RUNS);
     for (int r = 0; r < NUM_RUNS; ++r) {
         memset(hist_arr, 0, M * sizeof(int));
         double t0 = omp_get_wtime();
