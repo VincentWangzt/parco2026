@@ -34,7 +34,7 @@ done
 echo "[CLEANUP] Removing build artifacts..."
 
 # ── Binaries ─────────────────────────────────────────────────────────────────
-rm -f serial histogram_omp histogram_fast false_sharing_exp
+rm -f serial histogram_omp histogram_fast false_sharing_exp histogram_fast_div
 rm -f *.o
 
 # ── Output .dat files (histogram results, not inputs) ────────────────────────
@@ -72,7 +72,7 @@ if [ -d results ] && [ -z "$(ls -A results 2>/dev/null)" ]; then
     rmdir results
 fi
 
-if [ -d results_slurm ] && [ -z "$(ls -A results 2>/dev/null)" ]; then
+if [ -d results_slurm ] && [ -z "$(ls -A results_slurm 2>/dev/null)" ]; then
     rmdir results_slurm
 fi
 
