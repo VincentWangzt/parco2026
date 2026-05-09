@@ -3,6 +3,7 @@ serial
 histogram_omp
 histogram_fast
 false_sharing_exp
+histogram_fast_div
 
 # Generated data files
 *.dat
