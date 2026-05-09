@@ -4,9 +4,12 @@
  * False Sharing Experiment: measure impact of cache-line padding.
  *
  * Uses thread-private histogram strategy with configurable padding.
- * M is read from the input file; padding is specified via CLI.
+ * M can be read from the input file or overridden via CLI.
  *
- * Usage: ./false_sharing_exp <input> <padding_bytes> <num_threads> [runs=5] [warmup=2]
+ * Usage: ./false_sharing_exp <input> <padding_bytes> <num_threads> [runs=5] [warmup=2] [M_override]
+ *
+ * If M_override is provided, it overrides the M value in the input file.
+ * This allows reusing the same input file with different bin counts.
  *
  * Output to stderr:
  *   FALSESHARE,<M>,<padding_bytes>,<threads>,<N>,<mean_sec>,<std_sec>
@@ -83,7 +86,7 @@ void compute_histogram_with_padding(int padding_bytes, int nthreads) {
 
 int main(int argc, char* argv[]) {
     if (argc < 4) {
-        cerr << "Usage: ./false_sharing_exp <input> <padding_bytes> <num_threads> [runs=5] [warmup=2]" << endl;
+        cerr << "Usage: ./false_sharing_exp <input> <padding_bytes> <num_threads> [runs=5] [warmup=2] [M_override]" << endl;
         return 1;
     }
 
@@ -92,8 +95,15 @@ int main(int argc, char* argv[]) {
     int nthreads      = atoi(argv[3]);
     int num_runs      = (argc > 4) ? atoi(argv[4]) : 5;
     int warmup        = (argc > 5) ? atoi(argv[5]) : 2;
+    int M_override    = (argc > 6) ? atoi(argv[6]) : 0;
 
     read_inputs(input_file);
+
+    // Override M if specified on command line
+    if (M_override > 0) {
+        M = M_override;
+        hist.assign(M, 0);
+    }
 
     // Warmup
     for (int r = 0; r < warmup; ++r) {

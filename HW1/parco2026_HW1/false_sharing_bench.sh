@@ -1,10 +1,12 @@
 #!/bin/bash
 # false_sharing_bench.sh — False Sharing Experiment Sweep
-# Runs 4 experiments:
+# Runs 4 experiments using a SINGLE input file with varying M values:
 #   A: Dense M sweep (primary data)
 #   B: Paired analysis (extracted from A, no extra runs)
 #   C: Thread count scaling (M=32 vs M=33)
 #   D: Padding threshold (M=33, threads=4)
+#
+# The same input file is reused across all experiments; M is overridden via CLI.
 #
 # Usage: ./false_sharing_bench.sh [output_dir]
 
@@ -21,6 +23,10 @@ CSV_D="$RESULT_DIR/fs_expD_padding_${TIMESTAMP}.csv"
 # Use N=100M, uniform [0,1)
 FS_N=100000000
 FS_SEED=42
+FS_M_FILE=256          # M stored in the input file (arbitrary, will be overridden)
+
+# Single input file for all experiments
+INPUT_FILE="$RESULT_DIR/input_fs.dat"
 
 # Experiment A: Dense M sweep
 M_VALUES="8 9 12 16 17 18 20 24 32 33 36 48 64 65 72"
@@ -45,6 +51,7 @@ WARMUP=2
 echo "═══════════════════════════════════════════════════"
 echo " False Sharing Experiment Suite"
 echo " N=$FS_N, seed=$FS_SEED"
+echo " Single input file, M overridden per run"
 echo "═══════════════════════════════════════════════════"
 echo ""
 
@@ -53,15 +60,12 @@ echo "[BUILD] Compiling false_sharing_exp..."
 make false_sharing_exp 2>&1 | grep -v "^make\[" || true
 echo ""
 
-# ── Generate input files for all M values ────────────────────────────────────
-echo "[GEN] Generating input files for all M values..."
-ALL_M_NEEDED=$(echo "$M_VALUES $EXP_C_M_ALIGNED $EXP_C_M_MISALIGNED $EXP_D_M" | tr ' ' '\n' | sort -un | tr '\n' ' ')
-for m in $ALL_M_NEEDED; do
-    fname="$RESULT_DIR/input_m${m}.dat"
-    if [ ! -f "$fname" ]; then
-        python3 gen_input.py $FS_N $m 0.0 1.0 "$fname" $FS_SEED
-    fi
-done
+# ── Generate single input file ───────────────────────────────────────────────
+echo "[GEN] Generating single input file (N=$FS_N, M_file=$FS_M_FILE)..."
+if [ ! -f "$INPUT_FILE" ]; then
+    python3 gen_input.py $FS_N $FS_M_FILE 0.0 1.0 "$INPUT_FILE" $FS_SEED
+fi
+echo "  -> $INPUT_FILE"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -74,11 +78,10 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "M,padding_bytes,threads,N,mean_sec,std_sec,spill_bytes,aligned" > "$CSV_A"
 
 for m in $M_VALUES; do
-    fname="$RESULT_DIR/input_m${m}.dat"
     export OMP_NUM_THREADS=$EXP_A_THREADS
 
     echo -n "  M=$m: "
-    output=$(./false_sharing_exp "$fname" $EXP_A_PADDING $EXP_A_THREADS $NUM_RUNS $WARMUP 2>&1 > "$RESULT_DIR/out_fs_m${m}.dat")
+    output=$(./false_sharing_exp "$INPUT_FILE" $EXP_A_PADDING $EXP_A_THREADS $NUM_RUNS $WARMUP $m 2>&1 > "$RESULT_DIR/out_fs_m${m}.dat")
     timing_line=$(echo "$output" | grep "^FALSESHARE,")
 
     mean=$(echo "$timing_line" | cut -d',' -f6)
@@ -153,13 +156,12 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "M,padding_bytes,threads,N,mean_sec,std_sec" > "$CSV_C"
 
 for m in $EXP_C_M_ALIGNED $EXP_C_M_MISALIGNED; do
-    fname="$RESULT_DIR/input_m${m}.dat"
     echo "  M=$m:"
     for threads in $EXP_C_THREADS; do
         export OMP_NUM_THREADS=$threads
         echo -n "    t=$threads: "
 
-        output=$(./false_sharing_exp "$fname" $EXP_C_PADDING $threads $NUM_RUNS $WARMUP 2>&1 > /dev/null)
+        output=$(./false_sharing_exp "$INPUT_FILE" $EXP_C_PADDING $threads $NUM_RUNS $WARMUP $m 2>&1 > /dev/null)
         timing_line=$(echo "$output" | grep "^FALSESHARE,")
         mean=$(echo "$timing_line" | cut -d',' -f6)
         std=$(echo "$timing_line" | cut -d',' -f7)
@@ -180,13 +182,12 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 echo "M,padding_bytes,threads,N,mean_sec,std_sec" > "$CSV_D"
 
-fname="$RESULT_DIR/input_m${EXP_D_M}.dat"
 export OMP_NUM_THREADS=$EXP_D_THREADS
 
 for pad in $EXP_D_PADDINGS; do
     echo -n "  padding=${pad}B: "
 
-    output=$(./false_sharing_exp "$fname" $pad $EXP_D_THREADS $NUM_RUNS $WARMUP 2>&1 > /dev/null)
+    output=$(./false_sharing_exp "$INPUT_FILE" $pad $EXP_D_THREADS $NUM_RUNS $WARMUP $EXP_D_M 2>&1 > /dev/null)
     timing_line=$(echo "$output" | grep "^FALSESHARE,")
     mean=$(echo "$timing_line" | cut -d',' -f6)
     std=$(echo "$timing_line" | cut -d',' -f7)
@@ -201,6 +202,7 @@ echo ""
 echo "═══════════════════════════════════════════════════"
 echo " False Sharing Experiments Complete"
 echo "═══════════════════════════════════════════════════"
+echo " Input file:             $INPUT_FILE"
 echo " Exp A (dense sweep):    $CSV_A"
 echo " Exp C (thread scaling): $CSV_C"
 echo " Exp D (padding):        $CSV_D"
