@@ -143,40 +143,7 @@ for input in $INPUTS; do
         done
     done
 
-    # Fast version sweep
-    echo "  [FAST]"
-    for threads in $THREAD_COUNTS; do
-        export OMP_NUM_THREADS=$threads
-        output_file="$RESULT_DIR/out_fast_t${threads}_$(basename $input .dat).bin"
-
-        echo -n "  fast / t=$threads: "
-
-        timing_line=$(./histogram_fast "$bin_input" "$output_file" $NUM_RUNS $WARMUP 2>&1 | grep "^TIMING,")
-        mean=$(echo "$timing_line" | cut -d',' -f6)
-        std=$(echo "$timing_line" | cut -d',' -f7)
-        N_val=$(echo "$timing_line" | cut -d',' -f4)
-        M_val=$(echo "$timing_line" | cut -d',' -f5)
-
-        # Verify correctness: compare binary outputs directly, only invoke check.py on mismatch
-        serial_ref="$RESULT_DIR/out_serial_$(basename $input .dat).bin"
-        correct="yes"
-        if cmp -s "$output_file" "$serial_ref"; then
-            :  # byte-identical to verified serial output
-        else
-            # Convert to text and run check.py
-            output_file_txt="${output_file%.bin}.dat"
-            python3 convert_to_binary.py --reverse "$output_file" "$output_file_txt"
-            if ! python3 check.py "$input" "$output_file_txt" 2>&1 | grep -q "CORRECT"; then
-                correct="no"
-            fi
-            rm -f "$output_file_txt"
-        fi
-
-        echo "mean=${mean}s std=${std}s correct=${correct}"
-        echo "fast,${threads},${N_val},${M_val},${mean},${std},${correct}" >> "$CSV"
-    done
-
-    # Fast ILP baseline version sweep (no ILP, for comparison)
+    # Fast ILP version sweep (dual ILP + reciprocal)
     echo "  [FAST_ILP]"
     for threads in $THREAD_COUNTS; do
         export OMP_NUM_THREADS=$threads
@@ -209,7 +176,7 @@ for input in $INPUTS; do
         echo "fast_ilp,${threads},${N_val},${M_val},${mean},${std},${correct}" >> "$CSV"
     done
 
-    # Fast division version sweep (standard division, no reciprocal)
+    # Fast division version sweep (reciprocal only, no ILP)
     echo "  [FAST_DIV]"
     for threads in $THREAD_COUNTS; do
         export OMP_NUM_THREADS=$threads
@@ -240,6 +207,39 @@ for input in $INPUTS; do
 
         echo "mean=${mean}s std=${std}s correct=${correct}"
         echo "fast_div,${threads},${N_val},${M_val},${mean},${std},${correct}" >> "$CSV"
+    done
+
+    # Fast malloc version sweep (standard division, malloc'd private histograms)
+    echo "  [FAST_MALLOC]"
+    for threads in $THREAD_COUNTS; do
+        export OMP_NUM_THREADS=$threads
+        output_file="$RESULT_DIR/out_fast_malloc_t${threads}_$(basename $input .dat).bin"
+
+        echo -n "  fast_malloc / t=$threads: "
+
+        timing_line=$(./histogram_fast_malloc "$bin_input" "$output_file" $NUM_RUNS $WARMUP 2>&1 | grep "^TIMING,")
+        mean=$(echo "$timing_line" | cut -d',' -f6)
+        std=$(echo "$timing_line" | cut -d',' -f7)
+        N_val=$(echo "$timing_line" | cut -d',' -f4)
+        M_val=$(echo "$timing_line" | cut -d',' -f5)
+
+        # Verify correctness: compare binary outputs directly, only invoke check.py on mismatch
+        serial_ref="$RESULT_DIR/out_serial_$(basename $input .dat).bin"
+        correct="yes"
+        if cmp -s "$output_file" "$serial_ref"; then
+            :  # byte-identical to verified serial output
+        else
+            # Convert to text and run check.py
+            output_file_txt="${output_file%.bin}.dat"
+            python3 convert_to_binary.py --reverse "$output_file" "$output_file_txt"
+            if ! python3 check.py "$input" "$output_file_txt" 2>&1 | grep -q "CORRECT"; then
+                correct="no"
+            fi
+            rm -f "$output_file_txt"
+        fi
+
+        echo "mean=${mean}s std=${std}s correct=${correct}"
+        echo "fast_malloc,${threads},${N_val},${M_val},${mean},${std},${correct}" >> "$CSV"
     done
     echo ""
 done

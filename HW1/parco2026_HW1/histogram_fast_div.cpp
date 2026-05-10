@@ -1,19 +1,19 @@
 /*
  * Foundations of Parallel Computing II, Spring 2026.
  * Instructor: Chao Yang @ Peking University.
- * Optimized parallel histogram — standard division variant.
+ * Optimized parallel histogram — initial version for iterative refinement.
  *
- * Usage: ./histogram_fast_div <input> <output> [num_runs] [warmup_runs]
+ * Usage: ./histogram_fast <input> <output> [num_runs] [warmup_runs] [num_runs] [warmup_runs]
  *
  * Optimizations applied:
  * 1. Thread-private histograms with cache-line padding
  * 2. Aligned memory allocation (posix_memalign)
- * 3. Standard division (no reciprocal multiply)
+ * 3. Reciprocal multiply (avoid division in hot loop)
  * 4. schedule(static) for spatial locality
  * 5. Parallel merge phase
  *
  * Timing output (stderr):
- *   TIMING,fast_div,<threads>,<N>,<M>,<mean_sec>,<std_sec>
+ *   TIMING,fast,<threads>,<N>,<M>,<mean_sec>,<std_sec>
  */
 
 #include <iostream>
@@ -28,12 +28,12 @@
 
 using namespace std;
 
-// --- Configuration ----------------------------------------------------------
+// ─── Configuration ──────────────────────────────────────────────────────────
 static const int CACHE_LINE = 64;
 static const int INTS_PER_LINE = CACHE_LINE / sizeof(int);  // 16
 static int NUM_RUNS = 5;
 static int WARMUP_RUNS = 2;
-// ----------------------------------------------------------------------------
+// ────────────────────────────────────────────────────────────────────────────
 
 static int N, M;
 static double min_val, max_val;
@@ -57,7 +57,7 @@ static T* aligned_alloc_array(size_t count) {
 
 static void read_inputs(const char* filename) {
     if (ends_with(filename, ".bin")) {
-        // Binary format: [N:i32][M:i32][min_val:f64][max_val:f64][data: N*f64]
+        // Binary format: [N:i32][M:i32][min_val:f64][max_val:f64][data: N×f64]
         FILE* f = fopen(filename, "rb");
         if (!f) { fprintf(stderr, "ERROR: Cannot open %s\n", filename); abort(); }
         fread(&N, sizeof(int), 1, f);
@@ -84,7 +84,7 @@ static void read_inputs(const char* filename) {
 
 static void compute_histogram() {
     const int nthreads = omp_get_max_threads();
-    const double bin_width = (max_val - min_val) / (double)M;  // standard division
+    const double inv_bin_width = (double)M / (max_val - min_val);  // reciprocal
     const double dmin = min_val;
     const int Mlocal = M;
 
@@ -102,7 +102,7 @@ static void compute_histogram() {
 
         #pragma omp for schedule(static)
         for (int i = 0; i < N; ++i) {
-            int bin = (int)((data_arr[i] - dmin) / bin_width);
+            int bin = (int)((data_arr[i] - dmin) * inv_bin_width);
             // Clamp to valid range
             if (bin < 0) bin = 0;
             if (bin >= Mlocal) bin = Mlocal - 1;
@@ -124,7 +124,7 @@ static void compute_histogram() {
 
 static void write_outputs(const char* filename) {
     if (ends_with(filename, ".bin")) {
-        // Binary format: [hist: M * int32]
+        // Binary format: [hist: M × int32]
         FILE* f = fopen(filename, "wb");
         if (!f) { fprintf(stderr, "ERROR: Cannot open %s\n", filename); abort(); }
         fwrite(hist_arr, sizeof(int), M, f);
@@ -141,7 +141,7 @@ static void write_outputs(const char* filename) {
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "Usage: ./histogram_fast_div <input> <output> [num_runs] [warmup_runs]\n");
+        fprintf(stderr, "Usage: ./histogram_fast <input> <output> [num_runs] [warmup_runs]\n");
         return 1;
     }
 
@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
     for (int r = 0; r < NUM_RUNS; ++r) sq_sum += (times[r] - mean) * (times[r] - mean);
     double stddev = sqrt(sq_sum / NUM_RUNS);
 
-    fprintf(stderr, "TIMING,fast_div,%d,%d,%d,%.6f,%.6f\n",
+    fprintf(stderr, "TIMING,fast,%d,%d,%d,%.6f,%.6f\n",
             omp_get_max_threads(), N, M, mean, stddev);
 
     write_outputs(argv[2]);

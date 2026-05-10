@@ -34,7 +34,7 @@ done
 echo "[CLEANUP] Removing build artifacts..."
 
 # ── Binaries ─────────────────────────────────────────────────────────────────
-rm -f serial histogram_omp histogram_fast false_sharing_exp histogram_fast_div histogram_fast_ilp
+rm -f serial histogram_omp histogram_fast_ilp false_sharing_exp histogram_fast_malloc histogram_fast_div
 rm -f *.o
 
 # ── Output .dat files (histogram results, not inputs) ────────────────────────

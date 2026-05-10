@@ -1,9 +1,9 @@
-# Iterative Refinement Workflow for `histogram_fast.cpp`
+# Iterative Refinement Workflow for `histogram_fast_ilp.cpp`
 
 ## Purpose
 
 This document defines a generic methodology for an agent (or human) to iteratively
-optimize `histogram_fast.cpp`. It describes **HOW** to approach optimization — not
+optimize `histogram_fast_ilp.cpp`. It describes **HOW** to approach optimization — not
 **WHAT** specific optimizations to try.
 
 ---
@@ -14,7 +14,7 @@ optimize `histogram_fast.cpp`. It describes **HOW** to approach optimization —
 |------------|--------|
 | Correctness | Must produce byte-identical output to `./serial` (or pass `python3 check.py`) |
 | Binary I/O | Input: `.bin` files; Output: `.bin` files |
-| CLI interface | `./histogram_fast <input.bin> <output.bin>` |
+| CLI interface | `./histogram_fast_ilp <input.bin> <output.bin>` |
 | Timing protocol | `omp_get_wtime()`, 2 warmup + 5 measured runs, mean±std to stderr |
 | Max threads | 16 (honor `OMP_NUM_THREADS`) |
 | Language | C/C++ with OpenMP |
@@ -23,7 +23,7 @@ optimize `histogram_fast.cpp`. It describes **HOW** to approach optimization —
 
 ## 2. Scope (What CAN Change)
 
-Anything in `histogram_fast.cpp` and its compilation flags, including but not limited to:
+Anything in `histogram_fast_ilp.cpp` and its compilation flags, including but not limited to:
 
 - Algorithmic approach (loop structure, multi-pass, tiling)
 - Memory layout (alignment, padding, allocation strategy)
@@ -45,8 +45,8 @@ All intermediate outputs go in `results_test/`. Create it if it doesn't exist.
 results_test/
 ├── out_serial_input1.bin      # serial reference output (input1)
 ├── out_serial_input2.bin      # serial reference output (input2)
-├── out_fast_input1.bin        # histogram_fast output (input1)
-├── out_fast_input2.bin        # histogram_fast output (input2)
+├── out_fast_input1.bin        # histogram_fast_ilp output (input1)
+├── out_fast_input2.bin        # histogram_fast_ilp output (input2)
 └── refinement.log             # optimization log (see §7)
 ```
 
@@ -56,7 +56,7 @@ results_test/
 
 ### Setup
 ```bash
-make histogram_fast serial
+make histogram_fast_ilp serial
 export OMP_NUM_THREADS=16
 mkdir -p results_test
 ```
@@ -78,7 +78,7 @@ python3 convert_to_binary.py input2.dat input2.bin
 
 ### Primary benchmark (for decision making)
 ```bash
-./histogram_fast input2.bin results_test/out_fast_input2.bin 20
+./histogram_fast_ilp input2.bin results_test/out_fast_input2.bin 20
 # Read TIMING line from stderr: TIMING,fast,16,100000000,256,<mean>,<std>
 ```
 
@@ -86,7 +86,7 @@ Use `input2.bin` (100M points) — it's large enough for stable measurements.
 
 ### Correctness check (two-tier: fast binary diff, fallback to check.py)
 ```bash
-./histogram_fast input1.bin results_test/out_fast_input1.bin
+./histogram_fast_ilp input1.bin results_test/out_fast_input1.bin
 
 # Tier 1: byte-identical to serial reference (fast, preferred)
 if cmp -s results_test/out_fast_input1.bin results_test/out_serial_input1.bin; then
@@ -102,7 +102,7 @@ fi
 ### Additional validation (after keeping a change)
 ```bash
 # Also verify on large input
-./histogram_fast input2.bin results_test/out_fast_input2.bin 20
+./histogram_fast_ilp input2.bin results_test/out_fast_input2.bin 20
 # Tier 1: byte-identical to serial reference (fast, preferred)
 if cmp -s results_test/out_fast_input2.bin results_test/out_serial_input2.bin; then
     echo "CORRECT (binary match)"
@@ -138,8 +138,8 @@ you won't know which one helped (or hurt).
 
 ### Step 4: Verify Correctness
 ```bash
-make histogram_fast
-./histogram_fast input1.bin results_test/out_fast_input1.bin 2>/dev/null
+make histogram_fast_ilp
+./histogram_fast_ilp input1.bin results_test/out_fast_input1.bin 2>/dev/null
 cmp -s results_test/out_fast_input1.bin results_test/out_serial_input1.bin
 ```
 
@@ -156,7 +156,7 @@ rm -f /tmp/out_fast_check.dat
 ### Step 5: Measure
 ```bash
 export OMP_NUM_THREADS=16
-./histogram_fast input2.bin results_test/out_fast_input2.bin 20
+./histogram_fast_ilp input2.bin results_test/out_fast_input2.bin 20
 ```
 
 Record `NEW_MEAN` and `NEW_STD` from the TIMING line on stderr.
@@ -197,8 +197,8 @@ Append to `results_test/refinement.log`:
 If an optimization doesn't help when expected:
 
 1. **Check if memory-bound:** If time scales with N (not compute), ALU optimizations won't help
-2. **Check compiler output:** `g++ -S -O3 ... histogram_fast.cpp` — is the compiler already doing what you tried?
-3. **Profile:** `perf stat ./histogram_fast input2.bin /dev/null` for IPC, cache misses, branch mispredictions
+2. **Check compiler output:** `g++ -S -O3 ... histogram_fast_ilp.cpp` — is the compiler already doing what you tried?
+3. **Profile:** `perf stat ./histogram_fast_ilp input2.bin /dev/null` for IPC, cache misses, branch mispredictions
 
 ---
 
@@ -217,11 +217,11 @@ If an optimization doesn't help when expected:
 
 ```bash
 # Full cycle (build, check, bench) — copy-paste ready:
-make histogram_fast \
-  && ./histogram_fast input1.bin results_test/out_fast_input1.bin 2>/dev/null \
+make histogram_fast_ilp \
+  && ./histogram_fast_ilp input1.bin results_test/out_fast_input1.bin 2>/dev/null \
   && cmp -s results_test/out_fast_input1.bin results_test/out_serial_input1.bin \
   && echo "✓ Correct" \
-  && OMP_NUM_THREADS=16 ./histogram_fast input2.bin results_test/out_fast_input2.bin 20
+  && OMP_NUM_THREADS=16 ./histogram_fast_ilp input2.bin results_test/out_fast_input2.bin 20
 
 # If cmp fails, debug with check.py:
 python3 convert_to_binary.py --reverse results_test/out_fast_input1.bin /tmp/_check.dat \

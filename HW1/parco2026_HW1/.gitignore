@@ -1,10 +1,10 @@
 # Compiled binaries
 serial
 histogram_omp
-histogram_fast
 histogram_fast_ilp
-false_sharing_exp
 histogram_fast_div
+false_sharing_exp
+histogram_fast_malloc
 
 # Generated data files
 *.dat

@@ -21,9 +21,9 @@ endif
 # Executables
 SERIAL       = serial
 HISTOGRAM    = histogram_omp
-FAST         = histogram_fast
-FAST_ILP     = histogram_fast_ilp
-FAST_DIV     = histogram_fast_div
+FAST         = histogram_fast_ilp
+FAST_ILP     = histogram_fast_div
+FAST_DIV     = histogram_fast_malloc
 FALSESHARE   = false_sharing_exp
 
 all: $(SERIAL) $(HISTOGRAM) $(FAST) $(FAST_ILP) $(FAST_DIV) $(FALSESHARE)
@@ -37,16 +37,16 @@ serial: serial.cpp
 histogram_omp: histogram_omp.cpp
 	$(CC) $(OPT) $(OMP_FLAG) $(OMP45_FLAGS) -o $@ $^ $(FLAGS)
 
-# Optimized fast version (reciprocal multiply)
-histogram_fast: histogram_fast.cpp
-	$(CC) $(OPT) $(OMP_FLAG) -o $@ $^ $(FLAGS)
-
-# Optimized fast version — baseline without ILP (for comparison)
+# Optimized fast version (dual ILP + reciprocal multiply)
 histogram_fast_ilp: histogram_fast_ilp.cpp
 	$(CC) $(OPT) $(OMP_FLAG) -o $@ $^ $(FLAGS)
 
-# Optimized fast version (standard division)
+# Optimized fast version (reciprocal multiply, no ILP)
 histogram_fast_div: histogram_fast_div.cpp
+	$(CC) $(OPT) $(OMP_FLAG) -o $@ $^ $(FLAGS)
+
+# Optimized fast version (standard division via malloc'd private histograms)
+histogram_fast_malloc: histogram_fast_malloc.cpp
 	$(CC) $(OPT) $(OMP_FLAG) -o $@ $^ $(FLAGS)
 
 # False sharing experiment
@@ -73,19 +73,19 @@ check: $(HISTOGRAM)
 	@rm -f output_check.dat
 
 check_fast: $(FAST)
-	@echo "=== Checking histogram_fast ==="
+	@echo "=== Checking histogram_fast_ilp ==="
 	OMP_NUM_THREADS=4 ./$(FAST) input1.dat output_fast_check.dat 2>/dev/null
 	python3 check.py input1.dat output_fast_check.dat
 	@rm -f output_fast_check.dat
 
 check_fast_ilp: $(FAST_ILP)
-	@echo "=== Checking histogram_fast_ilp ==="
+	@echo "=== Checking histogram_fast_div ==="
 	OMP_NUM_THREADS=4 ./$(FAST_ILP) input1.dat output_fast_ilp_check.dat 2>/dev/null
 	python3 check.py input1.dat output_fast_ilp_check.dat
 	@rm -f output_fast_ilp_check.dat
 
 check_fast_div: $(FAST_DIV)
-	@echo "=== Checking histogram_fast_div ==="
+	@echo "=== Checking histogram_fast_malloc ==="
 	OMP_NUM_THREADS=4 ./$(FAST_DIV) input1.dat output_fast_div_check.dat 2>/dev/null
 	python3 check.py input1.dat output_fast_div_check.dat
 	@rm -f output_fast_div_check.dat
