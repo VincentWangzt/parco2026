@@ -1,0 +1,293 @@
+═══════════════════════════════════════════════════
+ PARCO HW1 — Job 40899 on cn09
+ Date: Sun May 10 13:00:00 CST 2026
+ CPUs: 
+ Mem:  87381
+═══════════════════════════════════════════════════
+
+Generated N=10000000, M=256, range=[0.0,1.0] -> input1.dat
+Generated N=100000000, M=256, range=[0.0,1.0] -> input2.dat
+[INFO] OpenMP 4.5+ array reduction: no
+
+╔═══════════════════════════════════════════════════╗
+║  Running Strategy Benchmark                      ║
+╚═══════════════════════════════════════════════════╝
+═══════════════════════════════════════════════════
+ PARCO HW1 Benchmark Sweep
+ Output: results_slurm/benchmark_20260510_130118.csv
+═══════════════════════════════════════════════════
+
+[BUILD] Compiling all targets...
+[INFO] OpenMP 4.5+ array reduction: no
+
+[INFO] Available strategies: serial atomic critical private padded
+
+[CONVERT] input1.dat -> input1.bin
+Converted input1.dat -> input1.bin (N=10000000, M=256, 80000024 bytes)
+[CONVERT] input2.dat -> input2.bin
+Converted input2.dat -> input2.bin (N=100000000, M=256, 800000024 bytes)
+[SERIAL BASELINE]
+  serial / input1.dat: Converted results_slurm/out_serial_input1.bin -> results_slurm/out_serial_input1.dat (256 bins)
+mean=0.0223176s std=1.59567e-05s correct=yes
+  serial / input2.dat: Converted results_slurm/out_serial_input2.bin -> results_slurm/out_serial_input2.dat (256 bins)
+mean=0.225019s std=2.30364e-05s correct=yes
+
+[SWEEP] input1.dat
+  serial / t=1: mean=0.0223772s std=1.38477e-05s correct=yes
+  atomic / t=1: mean=0.0662179s std=6.91191e-05s correct=yes
+  atomic / t=2: mean=0.154653s std=0.00140232s correct=yes
+  critical / t=1: mean=0.155643s std=0.000110215s correct=yes
+  critical / t=2: mean=0.919424s std=0.00230459s correct=yes
+  private / t=1: mean=0.0212771s std=4.33399e-05s correct=yes
+  private / t=2: mean=0.0108089s std=1.12547e-05s correct=yes
+  private / t=4: mean=0.00546453s std=9.34597e-06s correct=yes
+  private / t=8: mean=0.0027667s std=5.70341e-06s correct=yes
+  private / t=16: mean=0.00141524s std=8.276e-06s correct=yes
+  padded / t=1: mean=0.0226114s std=4.59241e-05s correct=yes
+  padded / t=2: mean=0.0108098s std=3.64725e-05s correct=yes
+  padded / t=4: mean=0.00545558s std=6.8432e-06s correct=yes
+  padded / t=8: mean=0.00275424s std=6.84569e-06s correct=yes
+  padded / t=16: mean=0.00140252s std=6.91469e-06s correct=yes
+  [FAST_ILP]
+  fast_ilp / t=1: mean=0.016308s std=0.000050s correct=yes
+  fast_ilp / t=2: mean=0.008328s std=0.000013s correct=yes
+  fast_ilp / t=4: mean=0.004233s std=0.000010s correct=yes
+  fast_ilp / t=8: mean=0.002166s std=0.000006s correct=yes
+  fast_ilp / t=16: mean=0.001125s std=0.000006s correct=yes
+  [FAST_DIV]
+  fast_div / t=1: mean=0.017107s std=0.000052s correct=yes
+  fast_div / t=2: mean=0.008688s std=0.000032s correct=yes
+  fast_div / t=4: mean=0.004449s std=0.000009s correct=yes
+  fast_div / t=8: mean=0.002268s std=0.000008s correct=yes
+  fast_div / t=16: mean=0.001184s std=0.000007s correct=yes
+  [FAST_MALLOC]
+  fast_malloc / t=1: mean=0.020887s std=0.000055s correct=yes
+  fast_malloc / t=2: mean=0.010551s std=0.000035s correct=yes
+  fast_malloc / t=4: mean=0.005334s std=0.000008s correct=yes
+  fast_malloc / t=8: mean=0.002704s std=0.000007s correct=yes
+  fast_malloc / t=16: mean=0.001382s std=0.000014s correct=yes
+
+[SWEEP] input2.dat
+  serial / t=1: mean=0.225489s std=0.00033507s correct=yes
+  atomic / t=1: mean=0.66242s std=0.000343381s correct=yes
+  atomic / t=2: mean=1.54672s std=0.00569785s correct=yes
+  critical / t=1: mean=1.55634s std=0.000474726s correct=yes
+  critical / t=2: mean=9.23904s std=0.00747505s correct=yes
+  private / t=1: mean=0.214916s std=0.000416662s correct=yes
+  private / t=2: mean=0.108087s std=0.000177564s correct=yes
+  private / t=4: mean=0.0545191s std=6.0548e-05s correct=yes
+  private / t=8: mean=0.0275389s std=1.58659e-05s correct=yes
+  private / t=16: mean=0.0142259s std=0.000805875s correct=yes
+  padded / t=1: mean=0.215663s std=0.000606565s correct=yes
+  padded / t=2: mean=0.108217s std=0.00015624s correct=yes
+  padded / t=4: mean=0.0545429s std=5.36424e-05s correct=yes
+  padded / t=8: mean=0.027466s std=1.42522e-05s correct=yes
+  padded / t=16: mean=0.014895s std=0.000594237s correct=yes
+  [FAST_ILP]
+  fast_ilp / t=1: mean=0.164701s std=0.000846s correct=yes
+  fast_ilp / t=2: mean=0.083282s std=0.000258s correct=yes
+  fast_ilp / t=4: mean=0.042042s std=0.000130s correct=yes
+  fast_ilp / t=8: mean=0.021383s std=0.000045s correct=yes
+  fast_ilp / t=16: mean=0.011264s std=0.000679s correct=yes
+  [FAST_DIV]
+  fast_div / t=1: mean=0.172650s std=0.000551s correct=yes
+  fast_div / t=2: mean=0.087636s std=0.000448s correct=yes
+  fast_div / t=4: mean=0.044203s std=0.000097s correct=yes
+  fast_div / t=8: mean=0.022787s std=0.000057s correct=yes
+  fast_div / t=16: mean=0.011950s std=0.000829s correct=yes
+  [FAST_MALLOC]
+  fast_malloc / t=1: mean=0.210115s std=0.000495s correct=yes
+  fast_malloc / t=2: mean=0.105792s std=0.000155s correct=yes
+  fast_malloc / t=4: mean=0.053392s std=0.000023s correct=yes
+  fast_malloc / t=8: mean=0.026873s std=0.000041s correct=yes
+  fast_malloc / t=16: mean=0.013891s std=0.000734s correct=yes
+
+═══════════════════════════════════════════════════
+ Summary (speedup vs serial baseline)
+═══════════════════════════════════════════════════
+
+Strategy     Threads            N    Mean(s)     Std(s)  Speedup   OK
+──────────────────────────────────────────────────────────────────────
+serial             1     10000000  0.0223176 1.59567e-05    1.00x    ✓
+serial             1    100000000   0.225019 2.30364e-05    1.00x    ✓
+serial             1     10000000  0.0223772 1.38477e-05    1.00x    ✓
+atomic             1     10000000  0.0662179 6.91191e-05    0.34x    ✓
+atomic             2     10000000   0.154653 0.00140232    0.14x    ✓
+critical           1     10000000   0.155643 0.000110215    0.14x    ✓
+critical           2     10000000   0.919424 0.00230459    0.02x    ✓
+private            1     10000000  0.0212771 4.33399e-05    1.05x    ✓
+private            2     10000000  0.0108089 1.12547e-05    2.07x    ✓
+private            4     10000000 0.00546453 9.34597e-06    4.09x    ✓
+private            8     10000000  0.0027667 5.70341e-06    8.09x    ✓
+private           16     10000000 0.00141524  8.276e-06   15.81x    ✓
+padded             1     10000000  0.0226114 4.59241e-05    0.99x    ✓
+padded             2     10000000  0.0108098 3.64725e-05    2.07x    ✓
+padded             4     10000000 0.00545558 6.8432e-06    4.10x    ✓
+padded             8     10000000 0.00275424 6.84569e-06    8.12x    ✓
+padded            16     10000000 0.00140252 6.91469e-06   15.95x    ✓
+fast_ilp           1     10000000   0.016308   0.000050    1.37x    ✓
+fast_ilp           2     10000000   0.008328   0.000013    2.69x    ✓
+fast_ilp           4     10000000   0.004233   0.000010    5.29x    ✓
+fast_ilp           8     10000000   0.002166   0.000006   10.33x    ✓
+fast_ilp          16     10000000   0.001125   0.000006   19.89x    ✓
+fast_div           1     10000000   0.017107   0.000052    1.31x    ✓
+fast_div           2     10000000   0.008688   0.000032    2.58x    ✓
+fast_div           4     10000000   0.004449   0.000009    5.03x    ✓
+fast_div           8     10000000   0.002268   0.000008    9.87x    ✓
+fast_div          16     10000000   0.001184   0.000007   18.90x    ✓
+fast_malloc        1     10000000   0.020887   0.000055    1.07x    ✓
+fast_malloc        2     10000000   0.010551   0.000035    2.12x    ✓
+fast_malloc        4     10000000   0.005334   0.000008    4.20x    ✓
+fast_malloc        8     10000000   0.002704   0.000007    8.28x    ✓
+fast_malloc       16     10000000   0.001382   0.000014   16.19x    ✓
+serial             1    100000000   0.225489 0.00033507    1.00x    ✓
+atomic             1    100000000    0.66242 0.000343381    0.34x    ✓
+atomic             2    100000000    1.54672 0.00569785    0.15x    ✓
+critical           1    100000000    1.55634 0.000474726    0.14x    ✓
+critical           2    100000000    9.23904 0.00747505    0.02x    ✓
+private            1    100000000   0.214916 0.000416662    1.05x    ✓
+private            2    100000000   0.108087 0.000177564    2.09x    ✓
+private            4    100000000  0.0545191 6.0548e-05    4.14x    ✓
+private            8    100000000  0.0275389 1.58659e-05    8.19x    ✓
+private           16    100000000  0.0142259 0.000805875   15.85x    ✓
+padded             1    100000000   0.215663 0.000606565    1.05x    ✓
+padded             2    100000000   0.108217 0.00015624    2.08x    ✓
+padded             4    100000000  0.0545429 5.36424e-05    4.13x    ✓
+padded             8    100000000   0.027466 1.42522e-05    8.21x    ✓
+padded            16    100000000   0.014895 0.000594237   15.14x    ✓
+fast_ilp           1    100000000   0.164701   0.000846    1.37x    ✓
+fast_ilp           2    100000000   0.083282   0.000258    2.71x    ✓
+fast_ilp           4    100000000   0.042042   0.000130    5.36x    ✓
+fast_ilp           8    100000000   0.021383   0.000045   10.55x    ✓
+fast_ilp          16    100000000   0.011264   0.000679   20.02x    ✓
+fast_div           1    100000000   0.172650   0.000551    1.31x    ✓
+fast_div           2    100000000   0.087636   0.000448    2.57x    ✓
+fast_div           4    100000000   0.044203   0.000097    5.10x    ✓
+fast_div           8    100000000   0.022787   0.000057    9.90x    ✓
+fast_div          16    100000000   0.011950   0.000829   18.87x    ✓
+fast_malloc        1    100000000   0.210115   0.000495    1.07x    ✓
+fast_malloc        2    100000000   0.105792   0.000155    2.13x    ✓
+fast_malloc        4    100000000   0.053392   0.000023    4.22x    ✓
+fast_malloc        8    100000000   0.026873   0.000041    8.39x    ✓
+fast_malloc       16    100000000   0.013891   0.000734   16.23x    ✓
+
+Results saved to: results_slurm/benchmark_20260510_130118.csv
+
+[CLEANUP] Removing output artifacts and binaries...
+[CLEANUP] Removing build artifacts...
+[CLEANUP] Removing generated input files...
+[CLEANUP] Done.
+
+
+╔═══════════════════════════════════════════════════╗
+║  Running False Sharing Experiment                ║
+╚═══════════════════════════════════════════════════╝
+═══════════════════════════════════════════════════
+ False Sharing Padding Sweep
+ N=100000000, seed=42
+ M values: 8 33 128
+ Padding:  0 4 8 16 32 64 128 256 512
+ Threads:  4 16
+ Runs=20, Warmup=2
+═══════════════════════════════════════════════════
+
+[BUILD] Compiling false_sharing_exp...
+g++ -std=c++11 -O3 -march=native -flto -fno-trapping-math -fno-math-errno -fopenmp -o false_sharing_exp false_sharing_exp.cpp 
+
+[GEN] Generating input file (N=100000000, M_file=256)...
+Generated N=100000000, M=256, range=[0.0,1.0] -> results_slurm/input_fs.dat
+  -> results_slurm/input_fs.dat
+[CONVERT] results_slurm/input_fs.dat -> results_slurm/input_fs.bin
+Converted results_slurm/input_fs.dat -> results_slurm/input_fs.bin (N=100000000, M=256, 800000024 bytes)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Padding Sweep: M × padding_bytes × threads
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌─ M=8 (stride=32B, spill=32B)
+  │  threads=4
+  │    pad=0B: mean=0.266831s std=0.000282977s
+  │    pad=4B: mean=0.259865s std=0.00714649s
+  │    pad=8B: mean=0.206065s std=0.000125322s
+  │    pad=16B: mean=0.148313s std=9.84592e-05s
+  │    pad=32B: mean=0.226294s std=0.000151797s
+  │    pad=64B: mean=0.0565521s std=3.67779e-05s
+  │    pad=128B: mean=0.0541955s std=4.651e-05s
+  │    pad=256B: mean=0.0527256s std=0.000164209s
+  │    pad=512B: mean=0.0527023s std=0.000114068s
+  │  threads=16
+  │    pad=0B: mean=0.130267s std=0.000105656s
+  │    pad=4B: mean=0.0991594s std=6.73317e-05s
+  │    pad=8B: mean=0.0834695s std=0.000102143s
+  │    pad=16B: mean=0.0563209s std=0.000140479s
+  │    pad=32B: mean=0.0171957s std=0.000733476s
+  │    pad=64B: mean=0.0189247s std=0.000678261s
+  │    pad=128B: mean=0.014627s std=0.000782524s
+  │    pad=256B: mean=0.0137719s std=0.00103858s
+  │    pad=512B: mean=0.0137558s std=0.00102482s
+  └─
+
+  ┌─ M=33 (stride=132B, spill=4B)
+  │  threads=4
+  │    pad=0B: mean=0.157066s std=8.49896e-05s
+  │    pad=4B: mean=0.16686s std=9.89042e-05s
+  │    pad=8B: mean=0.185621s std=0.000125802s
+  │    pad=16B: mean=0.138522s std=7.64968e-05s
+  │    pad=32B: mean=0.102747s std=4.61806e-05s
+  │    pad=64B: mean=0.0574536s std=5.70079e-05s
+  │    pad=128B: mean=0.0543502s std=2.63253e-05s
+  │    pad=256B: mean=0.0543759s std=0.000114722s
+  │    pad=512B: mean=0.0536714s std=0.000121463s
+  │  threads=16
+  │    pad=0B: mean=0.0714558s std=7.3994e-05s
+  │    pad=4B: mean=0.0648s std=0.000108121s
+  │    pad=8B: mean=0.0558703s std=0.000179906s
+  │    pad=16B: mean=0.0403394s std=4.7767e-05s
+  │    pad=32B: mean=0.0314032s std=5.11744e-05s
+  │    pad=64B: mean=0.0160207s std=0.000667137s
+  │    pad=128B: mean=0.0141535s std=0.00106624s
+  │    pad=256B: mean=0.0141981s std=0.00100156s
+  │    pad=512B: mean=0.0141929s std=0.00104287s
+  └─
+
+  ┌─ M=128 (stride=512B, spill=0B)
+  │  threads=4
+  │    pad=0B: mean=0.122105s std=0.000516162s
+  │    pad=4B: mean=0.0928544s std=0.000553851s
+  │    pad=8B: mean=0.0922798s std=0.00240532s
+  │    pad=16B: mean=0.0812933s std=0.000110136s
+  │    pad=32B: mean=0.0553812s std=4.95772e-05s
+  │    pad=64B: mean=0.0549771s std=7.42593e-05s
+  │    pad=128B: mean=0.0542365s std=5.0711e-05s
+  │    pad=256B: mean=0.0536979s std=0.000146504s
+  │    pad=512B: mean=0.0536808s std=8.99828e-05s
+  │  threads=16
+  │    pad=0B: mean=0.033892s std=7.61781e-05s
+  │    pad=4B: mean=0.034534s std=0.00016744s
+  │    pad=8B: mean=0.0300587s std=5.49823e-05s
+  │    pad=16B: mean=0.0262508s std=0.000126824s
+  │    pad=32B: mean=0.0203316s std=0.000745572s
+  │    pad=64B: mean=0.0144604s std=0.00096106s
+  │    pad=128B: mean=0.0142972s std=0.00104851s
+  │    pad=256B: mean=0.0138895s std=0.000806344s
+  │    pad=512B: mean=0.0138658s std=0.000775357s
+  └─
+
+═══════════════════════════════════════════════════
+ False Sharing Padding Sweep Complete
+═══════════════════════════════════════════════════
+ Output: results_slurm/fs_padding_sweep_20260510_131218.csv
+
+ Summary by M value (threads=16):
+ ─────────────────────────────────────────────────
+   M=  8: no-pad=0.1303s  best=0.0138s  speedup=9.5x
+   M= 33: no-pad=0.0715s  best=0.0142s  speedup=5.0x
+   M=128: no-pad=0.0339s  best=0.0139s  speedup=2.4x
+
+
+[CLEANUP] Removing output artifacts and binaries...
+[CLEANUP] Removing build artifacts...
+[CLEANUP] Removing generated input files...
+[CLEANUP] Done.
+
+Done at Sun May 10 13:19:05 CST 2026
