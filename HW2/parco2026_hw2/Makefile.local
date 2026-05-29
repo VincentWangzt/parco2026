@@ -1,0 +1,41 @@
+# Makefile.local — local debug build with system OpenMPI (NOT for submission).
+# Submit the original Makefile (mpiicc) to the cluster; use this for development:
+#   module load mpi/openmpi-x86_64
+#   make -f Makefile.local            # build both
+#   make -f Makefile.local run-s      # case S (N=32),  4 ranks
+#   make -f Makefile.local run-m      # case M (N=1000), 16 ranks + verify.py
+#   make -f Makefile.local clean
+
+CXX      = g++
+MPICXX   = mpicxx
+STD      = -std=c++11
+# Debug flags: no optimization, full symbols, warnings.
+# Switch to -O2 before doing case-L timing runs.
+FLAGS    = -O0 -g3 -Wall -Wextra
+
+EXES = serial parallel
+
+all: $(EXES)
+
+serial: serial.cpp
+	$(CXX) $(STD) $(FLAGS) -o $@ $^
+
+parallel: parallel.cpp
+	$(MPICXX) $(STD) $(FLAGS) -o $@ $^
+
+# Convenience runs. --oversubscribe is harmless on this 64-core box and lets
+# the same recipe work on smaller machines.
+run-s: parallel
+	mpirun --oversubscribe -np 4 ./parallel 32
+
+run-m: parallel
+	mpirun --oversubscribe -np 16 ./parallel 1000
+	python3 verify.py y_N1000.txt
+
+run-l: parallel
+	mpirun --oversubscribe -np 16 ./parallel 8192
+
+clean:
+	rm -f $(EXES) *.o y_N*.txt
+
+.PHONY: all clean run-s run-m run-l
