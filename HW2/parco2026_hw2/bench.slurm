@@ -46,18 +46,9 @@ echo "=== nproc:   $(nproc)"
 echo "=== NS=$NS  PS=$PS  REPS=$REPS"
 echo
 
-# Clean rebuild with cluster's mpiicc (-O3 -march=native -mprefer-vector-
-# width=512 -funroll-loops, see Makefile). Builds all four binaries:
-#   serial         — assignment-required reference (g++)
-#   serial_timed   — same algorithm wrapped in MPI_Wtime for fair timing
-#   parallel       — submitted parallel kernel (stored-A int16 + AVX-512)
-#   parallel_otf   — extra-credit on-the-fly variant
-# `set -e` at the top of the script makes any compile error abort the job
-# before any [bench] line is emitted, so a half-built run can never poison
-# bench_results.csv.
+# Clean rebuild with cluster's mpiicc (-O3 from Makefile).
 make clean
-make all
-ls -la serial serial_timed parallel parallel_otf
+make
 echo
 
 # -----------------------------------------------------------------------
@@ -87,8 +78,6 @@ echo
 # -----------------------------------------------------------------------
 # Phase 1 — case L performance: serial vs 16-process parallel.
 # Five reps each. Median speedup goes into the report's headline number.
-# Also runs parallel_otf (extra-credit on-the-fly variant) for the report's
-# comparison table.
 # -----------------------------------------------------------------------
 echo "============================================================"
 echo "PHASE 1 — case L (serial vs parallel p=16)"
@@ -102,17 +91,11 @@ for N in $NS; do
     echo "[bench] parallel,$N,16,$r"
     mpirun -np 16 ./parallel "$N"
   done
-  if [ -x ./parallel_otf ]; then
-    for r in $(seq 1 "$REPS"); do
-      echo "[bench] parallel_otf,$N,16,$r"
-      mpirun -np 16 ./parallel_otf "$N"
-    done
-  fi
 done
 echo
 
 # -----------------------------------------------------------------------
-# Phase 2 — strong scaling (parallel and parallel_otf).
+# Phase 2 — strong scaling (parallel only).
 # Sweep p ∈ PS. The p=1 baseline IS the parallel build with 1 rank, NOT
 # the serial build, so S(p)=T(1)/T(p) measures only the parallelism (no
 # compiler/init bias).
@@ -127,14 +110,6 @@ for N in $NS; do
       mpirun -np "$p" ./parallel "$N"
     done
   done
-  if [ -x ./parallel_otf ]; then
-    for p in $PS; do
-      for r in $(seq 1 "$REPS"); do
-        echo "[bench] parallel_otf,$N,$p,$r"
-        mpirun -np "$p" ./parallel_otf "$N"
-      done
-    done
-  fi
 done
 echo
 

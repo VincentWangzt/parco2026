@@ -160,7 +160,7 @@ def make_plots(g):
     # speedup plot: one line per (exe, N) combo
     fig, ax = plt.subplots(figsize=(7, 4.5))
     markers = ["o", "s", "^", "D", "v", "*", "P"]
-    line_styles = {"parallel": "-", "parallel_otf": "--"}
+    line_styles = {"parallel": "-"}
     color_for_N = {}
     cmap = plt.get_cmap("tab10")
     idx = 0
