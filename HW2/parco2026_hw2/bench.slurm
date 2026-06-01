@@ -78,6 +78,8 @@ echo
 # -----------------------------------------------------------------------
 # Phase 1 — case L performance: serial vs 16-process parallel.
 # Five reps each. Median speedup goes into the report's headline number.
+# Also runs parallel_otf (extra-credit on-the-fly variant) for the report's
+# comparison table.
 # -----------------------------------------------------------------------
 echo "============================================================"
 echo "PHASE 1 — case L (serial vs parallel p=16)"
@@ -91,11 +93,17 @@ for N in $NS; do
     echo "[bench] parallel,$N,16,$r"
     mpirun -np 16 ./parallel "$N"
   done
+  if [ -x ./parallel_otf ]; then
+    for r in $(seq 1 "$REPS"); do
+      echo "[bench] parallel_otf,$N,16,$r"
+      mpirun -np 16 ./parallel_otf "$N"
+    done
+  fi
 done
 echo
 
 # -----------------------------------------------------------------------
-# Phase 2 — strong scaling (parallel only).
+# Phase 2 — strong scaling (parallel and parallel_otf).
 # Sweep p ∈ PS. The p=1 baseline IS the parallel build with 1 rank, NOT
 # the serial build, so S(p)=T(1)/T(p) measures only the parallelism (no
 # compiler/init bias).
@@ -110,6 +118,14 @@ for N in $NS; do
       mpirun -np "$p" ./parallel "$N"
     done
   done
+  if [ -x ./parallel_otf ]; then
+    for p in $PS; do
+      for r in $(seq 1 "$REPS"); do
+        echo "[bench] parallel_otf,$N,$p,$r"
+        mpirun -np "$p" ./parallel_otf "$N"
+      done
+    done
+  fi
 done
 echo
 

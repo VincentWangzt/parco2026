@@ -97,38 +97,42 @@ def summarize(rows):
               f"{min(ts):>12.6f}{statistics.median(ts):>12.6f}"
               f"{statistics.mean(ts):>12.6f}{max(ts):>12.6f}")
 
-    # case-L speedup
+    # case-L speedup: for each (parallel-like exe, N) print speedup vs serial
     print()
     print("=== Case L speedup (median) ===")
+    parallel_exes = sorted({e for (e, _, _) in g.keys()
+                            if e != "serial" and e != "serial_timed"})
     for (exe, N, p) in sorted(g.keys()):
         if exe != "serial":
             continue
-        par_key = ("parallel", N, 16)
-        if par_key not in g:
-            continue
-        ts_ser = statistics.median(g[(exe, N, p)])
-        ts_par = statistics.median(g[par_key])
-        speedup = ts_ser / ts_par if ts_par > 0 else float("inf")
-        print(f"  N={N}: T_serial={ts_ser:.4f}s  "
-              f"T_parallel(p=16)={ts_par:.4f}s  "
-              f"S={speedup:.3f}x  E={speedup/16:.3f}")
+        for par_exe in parallel_exes:
+            par_key = (par_exe, N, 16)
+            if par_key not in g:
+                continue
+            ts_ser = statistics.median(g[(exe, N, p)])
+            ts_par = statistics.median(g[par_key])
+            speedup = ts_ser / ts_par if ts_par > 0 else float("inf")
+            print(f"  {par_exe:>13s}  N={N}: T_serial={ts_ser:.4f}s  "
+                  f"T_par(p=16)={ts_par:.4f}s  "
+                  f"S={speedup:.3f}x  E={speedup/16:.3f}")
 
-    # strong scaling
+    # strong scaling, per (parallel-like exe)
     print()
     print("=== Strong scaling (median) ===")
-    Ns = sorted({n for (e, n, p) in g.keys() if e == "parallel"})
-    for N in Ns:
-        ps = sorted(p for (e, nn, p) in g.keys() if e == "parallel" and nn == N)
-        if (("parallel", N, 1) not in g) or len(ps) < 2:
-            continue
-        t1 = statistics.median(g[("parallel", N, 1)])
-        print(f"--- N = {N} ---")
-        print(f"  {'p':>4}{'T(p)':>12}{'S(p)':>10}{'E(p)':>10}")
-        for p in ps:
-            tp = statistics.median(g[("parallel", N, p)])
-            s = t1 / tp
-            e = s / p
-            print(f"  {p:>4}{tp:>12.6f}{s:>10.3f}{e:>10.3f}")
+    for par_exe in parallel_exes:
+        Ns = sorted({n for (e, n, p) in g.keys() if e == par_exe})
+        for N in Ns:
+            ps = sorted(p for (e, nn, p) in g.keys() if e == par_exe and nn == N)
+            if ((par_exe, N, 1) not in g) or len(ps) < 2:
+                continue
+            t1 = statistics.median(g[(par_exe, N, 1)])
+            print(f"--- {par_exe}  N = {N} ---")
+            print(f"  {'p':>4}{'T(p)':>12}{'S(p)':>10}{'E(p)':>10}")
+            for p in ps:
+                tp = statistics.median(g[(par_exe, N, p)])
+                s = t1 / tp
+                e = s / p
+                print(f"  {p:>4}{tp:>12.6f}{s:>10.3f}{e:>10.3f}")
     return g
 
 
@@ -141,46 +145,75 @@ def make_plots(g):
         print("matplotlib not available; skipping plots", file=sys.stderr)
         return
 
-    Ns = sorted({n for (e, n, p) in g.keys()
-                 if e == "parallel" and ("parallel", n, 1) in g})
+    parallel_exes = sorted({e for (e, _, _) in g.keys()
+                            if e != "serial" and e != "serial_timed"})
+    if not parallel_exes:
+        return
+    Ns = sorted({n for par_exe in parallel_exes
+                 for (e, n, p) in g.keys()
+                 if e == par_exe and (par_exe, n, 1) in g})
     if not Ns:
         return
-    ps_all = sorted({p for (e, n, p) in g.keys() if e == "parallel"})
+    ps_all = sorted({p for (e, n, p) in g.keys() if e in parallel_exes})
     os.makedirs("figs", exist_ok=True)
 
-    fig, ax = plt.subplots(figsize=(6, 4))
-    markers = ["o", "s", "^", "D", "v"]
-    for i, N in enumerate(Ns):
-        ps = sorted(p for (e, nn, p) in g.keys() if e == "parallel" and nn == N)
-        t1 = statistics.median(g[("parallel", N, 1)])
-        sp = [t1 / statistics.median(g[("parallel", N, p)]) for p in ps]
-        ax.plot(ps, sp, marker=markers[i % len(markers)], label=f"measured, N={N}")
-    ax.plot(ps_all, ps_all, "k--", label="ideal: S = p")
+    # speedup plot: one line per (exe, N) combo
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    markers = ["o", "s", "^", "D", "v", "*", "P"]
+    line_styles = {"parallel": "-", "parallel_otf": "--"}
+    color_for_N = {}
+    cmap = plt.get_cmap("tab10")
+    idx = 0
+    for par_exe in parallel_exes:
+        for N in Ns:
+            if (par_exe, N, 1) not in g:
+                continue
+            ps = sorted(p for (e, nn, p) in g.keys() if e == par_exe and nn == N)
+            t1 = statistics.median(g[(par_exe, N, 1)])
+            sp = [t1 / statistics.median(g[(par_exe, N, p)]) for p in ps]
+            color_for_N.setdefault(N, cmap(len(color_for_N) % 10))
+            ax.plot(ps, sp,
+                    marker=markers[idx % len(markers)],
+                    linestyle=line_styles.get(par_exe, "-"),
+                    color=color_for_N[N],
+                    label=f"{par_exe}, N={N}")
+            idx += 1
+    ax.plot(ps_all, ps_all, "k:", alpha=0.6, label="ideal: S = p")
     ax.set_xlabel("number of MPI processes p")
     ax.set_ylabel("speedup S(p) = T(1) / T(p)")
     ax.set_title("Strong-scaling speedup")
     ax.set_xticks(ps_all)
     ax.set_yticks(ps_all)
     ax.grid(alpha=0.3)
-    ax.legend()
+    ax.legend(loc="upper left", fontsize=8)
     fig.tight_layout()
     fig.savefig("figs/scaling_speedup.png", dpi=150)
     plt.close(fig)
 
-    fig, ax = plt.subplots(figsize=(6, 4))
-    for i, N in enumerate(Ns):
-        ps = sorted(p for (e, nn, p) in g.keys() if e == "parallel" and nn == N)
-        t1 = statistics.median(g[("parallel", N, 1)])
-        eff = [t1 / statistics.median(g[("parallel", N, p)]) / p for p in ps]
-        ax.plot(ps, eff, marker=markers[i % len(markers)], label=f"measured, N={N}")
-    ax.axhline(1.0, color="k", linestyle="--", label="ideal: E = 1")
+    # efficiency plot
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    idx = 0
+    for par_exe in parallel_exes:
+        for N in Ns:
+            if (par_exe, N, 1) not in g:
+                continue
+            ps = sorted(p for (e, nn, p) in g.keys() if e == par_exe and nn == N)
+            t1 = statistics.median(g[(par_exe, N, 1)])
+            eff = [t1 / statistics.median(g[(par_exe, N, p)]) / p for p in ps]
+            ax.plot(ps, eff,
+                    marker=markers[idx % len(markers)],
+                    linestyle=line_styles.get(par_exe, "-"),
+                    color=color_for_N[N],
+                    label=f"{par_exe}, N={N}")
+            idx += 1
+    ax.axhline(1.0, color="k", linestyle=":", alpha=0.6, label="ideal: E = 1")
     ax.set_xlabel("number of MPI processes p")
     ax.set_ylabel("efficiency E(p) = S(p) / p")
     ax.set_title("Strong-scaling efficiency")
     ax.set_xticks(ps_all)
     ax.set_ylim(0, 1.15)
     ax.grid(alpha=0.3)
-    ax.legend()
+    ax.legend(loc="lower left", fontsize=8)
     fig.tight_layout()
     fig.savefig("figs/scaling_efficiency.png", dpi=150)
     plt.close(fig)
