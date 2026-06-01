@@ -1,10 +1,9 @@
 #!/bin/bash
-#SBATCH -p compute
-#SBATCH --qos low
+#SBATCH -p cpu
 #SBATCH -J mpi-gemv-bench
-#SBATCH -N 1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task 1
 #SBATCH --ntasks-per-node 16
-#SBATCH -c 1
 #SBATCH --time 00:60:00
 #SBATCH --output bench.%j.out
 #SBATCH --mem 21844M

@@ -1,5 +1,5 @@
 CC = g++ -std=c++11
-MPICC = mpiicc -std=c++11
+MPICC = mpic++ -std=c++11
 # -O3 + native ISA (AVX-512 on EPYC 9754) so the compiler can vectorise the
 # inner reduction. -funroll-loops hides the integer-multiply latency on the
 # accumulator. -mprefer-vector-width=512 forces gcc to use the 512-bit zmm
