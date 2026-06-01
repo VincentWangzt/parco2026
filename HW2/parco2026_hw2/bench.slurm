@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -p compute
+#SBATCH -p cpu
 #SBATCH -J mpi-gemv-bench
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task 1

@@ -1,5 +1,5 @@
 CC = g++ -std=c++11
-MPICC = mpiicc -std=c++11
+MPICC = mpic++ -std=c++11
 FLAGS = -O3
 EXES = serial parallel serial_timed
 
