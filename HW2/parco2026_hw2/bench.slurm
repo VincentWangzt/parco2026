@@ -46,9 +46,18 @@ echo "=== nproc:   $(nproc)"
 echo "=== NS=$NS  PS=$PS  REPS=$REPS"
 echo
 
-# Clean rebuild with cluster's mpiicc (-O3 from Makefile).
+# Clean rebuild with cluster's mpiicc (-O3 -march=native -mprefer-vector-
+# width=512 -funroll-loops, see Makefile). Builds all four binaries:
+#   serial         — assignment-required reference (g++)
+#   serial_timed   — same algorithm wrapped in MPI_Wtime for fair timing
+#   parallel       — submitted parallel kernel (stored-A int16 + AVX-512)
+#   parallel_otf   — extra-credit on-the-fly variant
+# `set -e` at the top of the script makes any compile error abort the job
+# before any [bench] line is emitted, so a half-built run can never poison
+# bench_results.csv.
 make clean
-make
+make all
+ls -la serial serial_timed parallel parallel_otf
 echo
 
 # -----------------------------------------------------------------------
