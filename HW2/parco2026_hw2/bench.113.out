@@ -1,0 +1,329 @@
+=== node:    localhost.localdomain
+=== date:    Mon Jun  1 21:42:39 CST 2026
+=== nproc:   72
+=== NS=8192 16384  PS=1 2 4 8 16  REPS=5
+
+rm -f serial parallel serial_timed *.o
+g++ -std=c++11 -o serial serial.cpp -O3 -march=native -funroll-loops -ftree-vectorize
+mpic++ -std=c++11 -o parallel parallel.cpp -O3 -march=native -funroll-loops -ftree-vectorize
+mpic++ -std=c++11 -o serial_timed serial_timed.cpp -O3 -march=native -funroll-loops -ftree-vectorize
+
+============================================================
+PHASE 0 — correctness (cases S and M)
+============================================================
+--- CASE S (N = 32) ---
+Executing serial version with N = 32
+Wrote result to y_N32.txt
+y = 412672 423312 433952 444592 455232 465872 476512 487152 497792 508432 519072 529712 540352 550992 561632 572272 582912 593552 604192 614832 625472 636112 646752 657392 668032 678672 689312 699952 710592 721232 731872 742512
+Executing with N = 32, comm size = 16
+time=0.00012876 s
+Wrote result to y_N32.txt
+y = 412672 423312 433952 444592 455232 465872 476512 487152 497792 508432 519072 529712 540352 550992 561632 572272 582912 593552 604192 614832 625472 636112 646752 657392 668032 678672 689312 699952 710592 721232 731872 742512
+  >>> parallel == serial bit-for-bit
+PASS: all 32 elements of y match the reference.
+      y[:5]  = [412672, 423312, 433952, 444592, 455232]
+      y[-5:] = [699952, 710592, 721232, 731872, 742512]
+
+--- CASE M (N = 1000) ---
+Executing with N = 1000, comm size = 16
+time=0.00018626 s
+Wrote result to y_N1000.txt
+PASS: all 1000 elements of y match the reference.
+      y[:5]  = [24754000, 24761500, 24688000, 24733500, 24698000]
+      y[-5:] = [24701500, 24714000, 24745500, 24696000, 24765500]
+
+============================================================
+PHASE 1 — case L (serial vs parallel p=16)
+============================================================
+[bench] serial,8192,1,1
+Executing serial_timed with N = 8192
+time=0.0594353 s
+Wrote result to y_N8192_serial.txt
+[bench] serial,8192,1,2
+Executing serial_timed with N = 8192
+time=0.0591396 s
+Wrote result to y_N8192_serial.txt
+[bench] serial,8192,1,3
+Executing serial_timed with N = 8192
+time=0.0593438 s
+Wrote result to y_N8192_serial.txt
+[bench] serial,8192,1,4
+Executing serial_timed with N = 8192
+time=0.0591016 s
+Wrote result to y_N8192_serial.txt
+[bench] serial,8192,1,5
+Executing serial_timed with N = 8192
+time=0.0592976 s
+Wrote result to y_N8192_serial.txt
+[bench] parallel,8192,16,1
+Executing with N = 8192, comm size = 16
+time=0.0040666 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,16,2
+Executing with N = 8192, comm size = 16
+time=0.00390404 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,16,3
+Executing with N = 8192, comm size = 16
+time=0.00386623 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,16,4
+Executing with N = 8192, comm size = 16
+time=0.00390224 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,16,5
+Executing with N = 8192, comm size = 16
+time=0.00406191 s
+Wrote result to y_N8192.txt
+[bench] serial,16384,1,1
+Executing serial_timed with N = 16384
+time=0.240197 s
+Wrote result to y_N16384_serial.txt
+[bench] serial,16384,1,2
+Executing serial_timed with N = 16384
+time=0.240159 s
+Wrote result to y_N16384_serial.txt
+[bench] serial,16384,1,3
+Executing serial_timed with N = 16384
+time=0.239968 s
+Wrote result to y_N16384_serial.txt
+[bench] serial,16384,1,4
+Executing serial_timed with N = 16384
+time=0.240194 s
+Wrote result to y_N16384_serial.txt
+[bench] serial,16384,1,5
+Executing serial_timed with N = 16384
+time=0.240742 s
+Wrote result to y_N16384_serial.txt
+[bench] parallel,16384,16,1
+Executing with N = 16384, comm size = 16
+time=0.0150398 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,16,2
+Executing with N = 16384, comm size = 16
+time=0.015359 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,16,3
+Executing with N = 16384, comm size = 16
+time=0.0154505 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,16,4
+Executing with N = 16384, comm size = 16
+time=0.0149071 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,16,5
+Executing with N = 16384, comm size = 16
+time=0.0149501 s
+Wrote result to y_N16384.txt
+
+============================================================
+PHASE 2 — strong-scaling sweep
+============================================================
+[bench] parallel,8192,1,1
+Executing with N = 8192, comm size = 1
+time=0.0321305 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,1,2
+Executing with N = 8192, comm size = 1
+time=0.0322179 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,1,3
+Executing with N = 8192, comm size = 1
+time=0.0323757 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,1,4
+Executing with N = 8192, comm size = 1
+time=0.0331869 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,1,5
+Executing with N = 8192, comm size = 1
+time=0.0320909 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,2,1
+Executing with N = 8192, comm size = 2
+time=0.016464 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,2,2
+Executing with N = 8192, comm size = 2
+time=0.0166595 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,2,3
+Executing with N = 8192, comm size = 2
+time=0.016669 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,2,4
+Executing with N = 8192, comm size = 2
+time=0.016811 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,2,5
+Executing with N = 8192, comm size = 2
+time=0.0169533 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,4,1
+Executing with N = 8192, comm size = 4
+time=0.00853657 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,4,2
+Executing with N = 8192, comm size = 4
+time=0.00853688 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,4,3
+Executing with N = 8192, comm size = 4
+time=0.00860583 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,4,4
+Executing with N = 8192, comm size = 4
+time=0.00856718 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,4,5
+Executing with N = 8192, comm size = 4
+time=0.00860494 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,8,1
+Executing with N = 8192, comm size = 8
+time=0.00460634 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,8,2
+Executing with N = 8192, comm size = 8
+time=0.00462386 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,8,3
+Executing with N = 8192, comm size = 8
+time=0.00454441 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,8,4
+Executing with N = 8192, comm size = 8
+time=0.00468786 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,8,5
+Executing with N = 8192, comm size = 8
+time=0.00455746 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,16,1
+Executing with N = 8192, comm size = 16
+time=0.0040732 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,16,2
+Executing with N = 8192, comm size = 16
+time=0.00390427 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,16,3
+Executing with N = 8192, comm size = 16
+time=0.00393178 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,16,4
+Executing with N = 8192, comm size = 16
+time=0.00388172 s
+Wrote result to y_N8192.txt
+[bench] parallel,8192,16,5
+Executing with N = 8192, comm size = 16
+time=0.00386634 s
+Wrote result to y_N8192.txt
+[bench] parallel,16384,1,1
+Executing with N = 16384, comm size = 1
+time=0.130298 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,1,2
+Executing with N = 16384, comm size = 1
+time=0.1301 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,1,3
+Executing with N = 16384, comm size = 1
+time=0.130206 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,1,4
+Executing with N = 16384, comm size = 1
+time=0.131898 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,1,5
+Executing with N = 16384, comm size = 1
+time=0.13005 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,2,1
+Executing with N = 16384, comm size = 2
+time=0.0658827 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,2,2
+Executing with N = 16384, comm size = 2
+time=0.0700106 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,2,3
+Executing with N = 16384, comm size = 2
+time=0.0659547 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,2,4
+Executing with N = 16384, comm size = 2
+time=0.0671142 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,2,5
+Executing with N = 16384, comm size = 2
+time=0.0663235 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,4,1
+Executing with N = 16384, comm size = 4
+time=0.0342203 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,4,2
+Executing with N = 16384, comm size = 4
+time=0.0345238 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,4,3
+Executing with N = 16384, comm size = 4
+time=0.0346921 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,4,4
+Executing with N = 16384, comm size = 4
+time=0.0348623 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,4,5
+Executing with N = 16384, comm size = 4
+time=0.0349588 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,8,1
+Executing with N = 16384, comm size = 8
+time=0.0179842 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,8,2
+Executing with N = 16384, comm size = 8
+time=0.0181067 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,8,3
+Executing with N = 16384, comm size = 8
+time=0.0180498 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,8,4
+Executing with N = 16384, comm size = 8
+time=0.0180207 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,8,5
+Executing with N = 16384, comm size = 8
+time=0.0179344 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,16,1
+Executing with N = 16384, comm size = 16
+time=0.0152644 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,16,2
+Executing with N = 16384, comm size = 16
+time=0.0150407 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,16,3
+Executing with N = 16384, comm size = 16
+time=0.0158094 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,16,4
+Executing with N = 16384, comm size = 16
+time=0.015276 s
+Wrote result to y_N16384.txt
+[bench] parallel,16384,16,5
+Executing with N = 16384, comm size = 16
+time=0.015041 s
+Wrote result to y_N16384.txt
+
+PASS: all 8192 elements of y match the reference.
+      y[:5]  = [202059712, 202184112, 201571512, 201999912, 201697312]
+      y[-5:] = [203125512, 202722912, 202535312, 202530712, 202596112]
+PASS: all 16384 elements of y match the reference.
+      y[:5]  = [405307424, 405557568, 404309712, 405117856, 404490000]
+      y[-5:] = [404330000, 404480144, 404961288, 405721432, 405223576]
+=== done at Mon Jun  1 21:44:09 CST 2026 ===
