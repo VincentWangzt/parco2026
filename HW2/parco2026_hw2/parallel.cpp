@@ -136,11 +136,17 @@ int main(int argc, char* argv[]) {
   // 计算本地 local_y = local_A * x
   // A 是 int16, x 是 uint8, 累加器 int64。内层乘加每次只读 (2+1)=3 字节，
   // 算术强度比 v0 (16 字节/乘加) 高约 5x，DRAM 压力相应降低。
+  //
+  // __restrict__ 告诉编译器 row 与 x 不会发生别名重叠，解锁更激进的向量化。
+  // x 在所有进程上都是同一份完整副本，并且整个内层循环只读，所以这个保证一定成立。
+  // 试过 4 路手动展开（v5b），在带宽-bound 情形下未见额外收益；保留简洁版让
+  // 编译器借助 -funroll-loops 自由决定。
+  const uint8_t* __restrict__ xp = x.data();
   for (long i = 0; i < local_rows; ++i) {
-    const int16_t* row = local_A.data() + static_cast<size_t>(i) * N;
+    const int16_t* __restrict__ row = local_A.data() + static_cast<size_t>(i) * N;
     long long s = 0;
     for (long j = 0; j < N; ++j)
-      s += static_cast<long long>(row[j]) * static_cast<long long>(x[j]);
+      s += static_cast<long long>(row[j]) * static_cast<long long>(xp[j]);
     local_y[i] = s;
   }
 
