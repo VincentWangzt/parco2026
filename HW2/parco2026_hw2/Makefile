@@ -1,6 +1,10 @@
 CC = g++ -std=c++11
 MPICC = mpiicc -std=c++11
-FLAGS = -O3
+# -O3 + native ISA (AVX-512 on EPYC 9754) so the compiler can vectorise the
+# inner reduction. -funroll-loops hides the integer-multiply latency on the
+# accumulator. Cluster build uses mpiicc; if mpiicc is not on PATH (local box)
+# Makefile.local overrides MPICC -> mpicxx with the same flags.
+FLAGS = -O3 -march=native -funroll-loops -ftree-vectorize
 EXES = serial parallel serial_timed
 
 all: $(EXES)
