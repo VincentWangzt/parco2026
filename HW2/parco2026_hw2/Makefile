@@ -9,7 +9,7 @@ MPICC = mpiicc -std=c++11
 # on PATH (local box) Makefile.local overrides MPICC -> mpicxx with the same
 # flags.
 FLAGS = -O3 -march=native -mprefer-vector-width=512 -funroll-loops -ftree-vectorize
-EXES = serial parallel serial_timed
+EXES = serial parallel parallel_otf serial_timed
 
 all: $(EXES)
 
@@ -17,6 +17,12 @@ serial: serial.cpp
 	$(CC) -o $@ $^ $(FLAGS)
 
 parallel: parallel.cpp
+	$(MPICC) -o $@ $^ $(FLAGS)
+
+# parallel_otf: on-the-fly variant — A is not stored, the formula is
+# evaluated inside the inner loop. Extra-credit experiment, not the
+# submitted version. See parallel_otf.cpp for the rationale.
+parallel_otf: parallel_otf.cpp
 	$(MPICC) -o $@ $^ $(FLAGS)
 
 # serial_timed is the serial algorithm wrapped in MPI_Wtime so the
