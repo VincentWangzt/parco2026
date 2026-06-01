@@ -30,6 +30,10 @@ OUT=${OUT:-"bench_local.out"}
 # Local box: --oversubscribe avoids "not enough slots" errors;
 # --mca pml ob1 --mca btl self,vader pins the transport to shared-memory only
 # (the host's PSM3/UCX defaults fail in this container).
+# NOTE: explored --bind-to core --map-by socket in v2 but it consistently
+# degraded p={4,8} (e.g. p=8 16384: 35.8ms -> 59.3ms). The container's cpuset
+# already restricts cores; OMPI's hard binding fights cgroup placement. So we
+# do NOT bind on the local box. The cluster's bench.slurm uses SLURM's --cpu-bind.
 MPI_OPTS=${MPI_OPTS:-"--oversubscribe --mca pml ob1 --mca btl self,vader"}
 export OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 
