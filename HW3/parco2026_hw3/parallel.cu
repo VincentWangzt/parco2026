@@ -74,12 +74,23 @@ __global__ void generate_input_kernel(Value* x, long long N) {
 //
 // Out-of-range indices (when N is not a multiple of ELEMENTS_PER_BLOCK)
 // are zero-padded so the algorithm is uniform across blocks.
+//
+// Bank-conflict-free shared memory layout (GPU Gems 3, §39.2.3): we pad
+// every NUM_BANKS-th slot. Effective index = i + (i >> LOG_NUM_BANKS).
+// This eliminates the 32-way conflicts the naive `2*tid+1` indexing
+// causes when adjacent threads stride by powers of 2.
 // ---------------------------------------------------------------------------
+#define LOG_NUM_BANKS 5
+#define CONFLICT_FREE_OFFSET(n) ((n) >> LOG_NUM_BANKS)
+#define SDATA_PADDED_SIZE \
+  (ELEMENTS_PER_BLOCK + CONFLICT_FREE_OFFSET(ELEMENTS_PER_BLOCK - 1) + 1)
+#define SI(i) ((i) + CONFLICT_FREE_OFFSET(i))
+
 __global__ void block_scan_kernel(const Value* __restrict__ x,
                                   Value* __restrict__ y,
                                   Value* __restrict__ block_sums,
                                   long long N) {
-  __shared__ Value sdata[ELEMENTS_PER_BLOCK];
+  __shared__ Value sdata[SDATA_PADDED_SIZE];
 
   int tid = threadIdx.x;
   long long block_offset = (long long)blockIdx.x * ELEMENTS_PER_BLOCK;
@@ -90,8 +101,8 @@ __global__ void block_scan_kernel(const Value* __restrict__ x,
   // Load with zero-padding for tail block.
   Value va = (ai < N) ? x[ai] : (Value)0;
   Value vb = (bi < N) ? x[bi] : (Value)0;
-  sdata[tid] = va;
-  sdata[tid + BLOCK_SIZE] = vb;
+  sdata[SI(tid)] = va;
+  sdata[SI(tid + BLOCK_SIZE)] = vb;
 
   // ---- Up-sweep (reduce) ----
   int offset = 1;
@@ -100,17 +111,18 @@ __global__ void block_scan_kernel(const Value* __restrict__ x,
     if (tid < d) {
       int aidx = offset * (2 * tid + 1) - 1;
       int bidx = offset * (2 * tid + 2) - 1;
-      sdata[bidx] += sdata[aidx];
+      sdata[SI(bidx)] += sdata[SI(aidx)];
     }
     offset <<= 1;
   }
 
   // ---- Save total sum, clear last element to start exclusive scan ----
   if (tid == 0) {
+    int last = ELEMENTS_PER_BLOCK - 1;
     if (block_sums) {
-      block_sums[blockIdx.x] = sdata[ELEMENTS_PER_BLOCK - 1];
+      block_sums[blockIdx.x] = sdata[SI(last)];
     }
-    sdata[ELEMENTS_PER_BLOCK - 1] = (Value)0;
+    sdata[SI(last)] = (Value)0;
   }
 
   // ---- Down-sweep ----
@@ -120,9 +132,9 @@ __global__ void block_scan_kernel(const Value* __restrict__ x,
     if (tid < d) {
       int aidx = offset * (2 * tid + 1) - 1;
       int bidx = offset * (2 * tid + 2) - 1;
-      Value t = sdata[aidx];
-      sdata[aidx] = sdata[bidx];
-      sdata[bidx] += t;
+      Value t = sdata[SI(aidx)];
+      sdata[SI(aidx)] = sdata[SI(bidx)];
+      sdata[SI(bidx)] += t;
     }
   }
   __syncthreads();
@@ -130,10 +142,10 @@ __global__ void block_scan_kernel(const Value* __restrict__ x,
   // sdata now contains the *exclusive* scan of the loaded elements.
   // Convert exclusive -> inclusive by adding the original value, and write.
   if (ai < N) {
-    y[ai] = sdata[tid] + va;
+    y[ai] = sdata[SI(tid)] + va;
   }
   if (bi < N) {
-    y[bi] = sdata[tid + BLOCK_SIZE] + vb;
+    y[bi] = sdata[SI(tid + BLOCK_SIZE)] + vb;
   }
 }
 
