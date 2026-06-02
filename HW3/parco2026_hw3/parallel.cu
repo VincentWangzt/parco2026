@@ -49,15 +49,16 @@
 static const int BLOCK_SIZE = 256;
 static const int ELEMENTS_PER_BLOCK = 2 * BLOCK_SIZE;
 
-using Value = long long;
+using Input = int;     // input values are < 1000, int32 is plenty
+using Value = long long;  // accumulator / block sums / output: must hold > 2^31
 
 // ---------------------------------------------------------------------------
-// Kernel: generate input on the device
+// Kernel: generate input on the device (int32 — every value < 1000)
 // ---------------------------------------------------------------------------
-__global__ void generate_input_kernel(Value* x, long long N) {
+__global__ void generate_input_kernel(Input* x, long long N) {
   long long idx = (long long)blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < N) {
-    x[idx] = (idx * 17LL + 13LL) % 1000LL;
+    x[idx] = (int)((idx * 17LL + 13LL) % 1000LL);
   }
 }
 
@@ -85,6 +86,66 @@ __global__ void generate_input_kernel(Value* x, long long N) {
 #define SDATA_PADDED_SIZE \
   (ELEMENTS_PER_BLOCK + CONFLICT_FREE_OFFSET(ELEMENTS_PER_BLOCK - 1) + 1)
 #define SI(i) ((i) + CONFLICT_FREE_OFFSET(i))
+
+__global__ void block_scan_kernel_top(const Input* __restrict__ x,
+                                      Value* __restrict__ y,
+                                      Value* __restrict__ block_sums,
+                                      long long N) {
+  __shared__ Value sdata[SDATA_PADDED_SIZE];
+
+  int tid = threadIdx.x;
+  long long block_offset = (long long)blockIdx.x * ELEMENTS_PER_BLOCK;
+
+  long long ai = block_offset + tid;
+  long long bi = block_offset + tid + BLOCK_SIZE;
+
+  // Read int32 input, promote to long long in shared mem.
+  // Interleaved layout (sdata[tid], sdata[tid+BLOCK_SIZE]) is preserved from
+  // v2 — that pattern already coalesces over warp lanes and stays
+  // bank-conflict-free under the SI() padding.
+  Value va = (ai < N) ? (Value)x[ai] : (Value)0;
+  Value vb = (bi < N) ? (Value)x[bi] : (Value)0;
+  sdata[SI(tid)] = va;
+  sdata[SI(tid + BLOCK_SIZE)] = vb;
+
+  // ---- Up-sweep (reduce) ----
+  int offset = 1;
+  for (int d = ELEMENTS_PER_BLOCK >> 1; d > 0; d >>= 1) {
+    __syncthreads();
+    if (tid < d) {
+      int aidx = offset * (2 * tid + 1) - 1;
+      int bidx = offset * (2 * tid + 2) - 1;
+      sdata[SI(bidx)] += sdata[SI(aidx)];
+    }
+    offset <<= 1;
+  }
+
+  // ---- Save total sum, clear last element to start exclusive scan ----
+  if (tid == 0) {
+    int last = ELEMENTS_PER_BLOCK - 1;
+    if (block_sums) {
+      block_sums[blockIdx.x] = sdata[SI(last)];
+    }
+    sdata[SI(last)] = (Value)0;
+  }
+
+  // ---- Down-sweep ----
+  for (int d = 1; d < ELEMENTS_PER_BLOCK; d <<= 1) {
+    offset >>= 1;
+    __syncthreads();
+    if (tid < d) {
+      int aidx = offset * (2 * tid + 1) - 1;
+      int bidx = offset * (2 * tid + 2) - 1;
+      Value t = sdata[SI(aidx)];
+      sdata[SI(aidx)] = sdata[SI(bidx)];
+      sdata[SI(bidx)] += t;
+    }
+  }
+  __syncthreads();
+
+  if (ai < N) y[ai] = sdata[SI(tid)] + va;
+  if (bi < N) y[bi] = sdata[SI(tid + BLOCK_SIZE)] + vb;
+}
 
 __global__ void block_scan_kernel(const Value* __restrict__ x,
                                   Value* __restrict__ y,
@@ -228,6 +289,34 @@ static void inclusive_scan_recursive(const Value* d_in, Value* d_out,
   CUDA_CHECK(cudaGetLastError());
 }
 
+// ---------------------------------------------------------------------------
+// Top-level scan: reads from an `Input*` (int32) source, writes a Value
+// (long long) inclusive scan. Subsequent levels stay all-`Value`.
+// ---------------------------------------------------------------------------
+static void inclusive_scan_top(const Input* d_in, Value* d_out, long long N,
+                               Value* workspace) {
+  if (N <= 0) return;
+
+  long long num_blocks = (N + ELEMENTS_PER_BLOCK - 1) / ELEMENTS_PER_BLOCK;
+
+  Value* d_block_sums = workspace;
+  Value* d_block_inclusive = d_block_sums + num_blocks;
+  long long new_used = 2 * num_blocks;
+
+  block_scan_kernel_top<<<(int)num_blocks, BLOCK_SIZE>>>(d_in, d_out,
+                                                         d_block_sums, N);
+  CUDA_CHECK(cudaGetLastError());
+
+  if (num_blocks <= 1) return;
+
+  inclusive_scan_recursive(d_block_sums, d_block_inclusive, num_blocks,
+                           workspace, new_used);
+
+  add_block_offsets_kernel<<<(int)num_blocks, BLOCK_SIZE>>>(
+      d_out, d_block_inclusive, d_block_sums, N);
+  CUDA_CHECK(cudaGetLastError());
+}
+
 int main(int argc, char* argv[]) {
   long long N = 32;
   if (argc == 2) N = std::atoll(argv[1]);
@@ -249,9 +338,9 @@ int main(int argc, char* argv[]) {
             << ", ELEMENTS_PER_BLOCK = " << ELEMENTS_PER_BLOCK << "\n";
 
   // ---- Allocate device memory ----
-  Value* d_x = nullptr;
-  Value* d_y = nullptr;
-  CUDA_CHECK(cudaMalloc(&d_x, N * sizeof(Value)));
+  Input* d_x = nullptr;  // int32 — values are < 1000
+  Value* d_y = nullptr;  // long long — y[N-1] can exceed 2^31
+  CUDA_CHECK(cudaMalloc(&d_x, N * sizeof(Input)));
   CUDA_CHECK(cudaMalloc(&d_y, N * sizeof(Value)));
 
   // Pre-allocate scan workspace (block_sums + block_inclusive arrays for all
@@ -280,7 +369,7 @@ int main(int argc, char* argv[]) {
 
   // ---- Compute (this is the timed scan kernel chain) ----
   cudaEventRecord(e_compute_start);
-  inclusive_scan_recursive(d_x, d_y, N, d_workspace, 0);
+  inclusive_scan_top(d_x, d_y, N, d_workspace);
   cudaEventRecord(e_compute_stop);
 
   // ---- Copy result back ----
