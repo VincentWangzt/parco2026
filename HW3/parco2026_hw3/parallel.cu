@@ -387,14 +387,44 @@ int main(int argc, char* argv[]) {
   std::cout << "CUDA total (gen+scan+D2H): " << total_ms << " ms\n";
 
   // ---- Write output ----
+  // Hand-rolled itoa + single fwrite: 8M iostream `<<` calls take seconds
+  // on networked filesystems. We pre-allocate a worst-case char buffer
+  // (max 19 digits + newline per line for int64), fill it linearly, and
+  // emit it with one fwrite. This block is OUTSIDE the timed scan path,
+  // so it cannot affect scan-only timing.
   std::string filename = "scan_N" + std::to_string(N) + ".txt";
-  std::ofstream ofs(filename);
-  if (!ofs) {
+  FILE* fp = std::fopen(filename.c_str(), "wb");
+  if (!fp) {
     std::cerr << "ERROR: cannot open output file " << filename << "\n";
     return 1;
   }
-  for (long long i = 0; i < N; ++i) ofs << y[i] << "\n";
-  ofs.close();
+  // 19 digits is enough for any signed 64-bit integer; +1 for sign, +1 for '\n'.
+  static const int OUT_LINE_BYTES = 21;
+  std::vector<char> outbuf((size_t)N * OUT_LINE_BYTES);
+  size_t pos = 0;
+  for (long long i = 0; i < N; ++i) {
+    Value v = y[i];
+    char tmp[20];
+    int len = 0;
+    if (v < 0) {
+      outbuf[pos++] = '-';
+      // careful: -LLONG_MIN can't be negated, but our values are >= 0.
+      v = -v;
+    }
+    if (v == 0) {
+      tmp[len++] = '0';
+    } else {
+      while (v > 0) {
+        tmp[len++] = (char)('0' + (int)(v % 10));
+        v /= 10;
+      }
+    }
+    // tmp holds digits in reverse — flush in correct order.
+    for (int k = len - 1; k >= 0; --k) outbuf[pos++] = tmp[k];
+    outbuf[pos++] = '\n';
+  }
+  std::fwrite(outbuf.data(), 1, pos, fp);
+  std::fclose(fp);
   std::cout << "Wrote result to " << filename << "\n";
 
   if (N <= 100) {

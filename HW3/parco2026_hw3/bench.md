@@ -10,3 +10,4 @@ Protocol: 1 warmup, 21 timed iterations, median of CUDA scan (kernels-only) time
 | v2 | Bank-conflict-free shared mem (CONFLICT_FREE_OFFSET padding) | 1.063 | 1.69× | 0.135 | **kept** (33% faster vs v1; biggest single win) |
 | v3a (tried, reverted) | int32 input + int2 vectorized loads, consecutive-pair shared-mem layout | 1.100 | 1.64× | 0.138 | **reverted** — int2 forced a 2-way bank-conflict layout that more than ate the load savings |
 | v3 | int32 input only (interleaved layout retained from v2; scalar reads, long long sdata) | 1.018 | 1.77× | 0.134 | **kept** — ~4% faster vs v2 in 51-iter head-to-head; halves d_x footprint (32 MB instead of 64 MB at L) |
+| v4 | Hand-rolled itoa + single fwrite (post-timed-scan only) | 0.893 (drift) | n/a | 0.133 | **kept** — pure I/O QOL: end-to-end wall time at L drops 3.5 s → 0.71 s. Scan-only number drifted with steady-state GPU clocks during this measurement; do not attribute the ~14% delta to v4. |
