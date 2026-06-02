@@ -46,7 +46,7 @@
 //
 // Each thread processes 2 elements (Blelloch tree on 2*BLOCK_SIZE elements
 // per block). BLOCK_SIZE is the number of threads per block.
-static const int BLOCK_SIZE = 512;
+static const int BLOCK_SIZE = 256;
 static const int ELEMENTS_PER_BLOCK = 2 * BLOCK_SIZE;
 
 using Value = long long;

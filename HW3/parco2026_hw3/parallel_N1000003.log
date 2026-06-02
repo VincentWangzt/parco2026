@@ -1,0 +1,6 @@
+Executing CUDA prefix sum with N = 1000003
+GPU: NVIDIA GeForce RTX 2080 Ti (CC 7.5)
+BLOCK_SIZE = 256, ELEMENTS_PER_BLOCK = 512
+CUDA scan (kernels only): 0.58336 ms
+CUDA total (gen+scan+D2H): 10.6643 ms
+Wrote result to scan_N1000003.txt

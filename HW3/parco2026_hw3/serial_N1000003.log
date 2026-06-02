@@ -1,0 +1,3 @@
+Executing serial prefix sum with N = 1000003
+Serial compute time: 4.15517 ms
+Wrote result to scan_N1000003.txt

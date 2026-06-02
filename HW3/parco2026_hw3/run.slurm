@@ -1,12 +1,11 @@
 #!/bin/bash
-#SBATCH -o job_%j_%N.out
-#SBATCH -e job_%j_%N.err
+#SBATCH -o job_%j.out
 #SBATCH -p gpu
 #SBATCH -J hw3_scan
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=16
 #SBATCH -t 30:00
 
 # -----------------------------------------------------------------------------
@@ -28,15 +27,6 @@
 
 set -e
 set -u
-
-cd "$SLURM_SUBMIT_DIR" || cd "$(dirname "$0")"
-
-# --- Try to load common module names; ignore if not present ----------------
-if command -v module >/dev/null 2>&1; then
-  module purge 2>/dev/null || true
-  module load cuda/12.1 2>/dev/null || module load cuda 2>/dev/null || true
-  module load gcc       2>/dev/null || true
-fi
 
 echo "============================================================"
 echo "Host    : $(hostname)"
@@ -90,19 +80,21 @@ run_case 1000003 "M"
 
 # --- Case L: performance & speedup -----------------------------------------
 N_L=8388608
-N_REPEAT=11
+N_REPEAT=51
 echo
 echo "================  Case L  (N = ${N_L})  ================"
 
 SERIAL_TIMES_FILE=$(mktemp)
 CUDA_SCAN_TIMES_FILE=$(mktemp)
 CUDA_TOTAL_TIMES_FILE=$(mktemp)
+SERIAL_LOG_FILE=$(mktemp)
+CUDA_LOG_FILE=$(mktemp)
 
 # ---- Serial: ${N_REPEAT} runs ----
 echo "[Serial] running ${N_REPEAT} timed iterations..."
 for i in $(seq 1 ${N_REPEAT}); do
-  ./serial "$N_L" > "serial_L_run${i}.log"
-  T=$(extract_serial_ms "serial_L_run${i}.log")
+  ./serial "$N_L" > "$SERIAL_LOG_FILE"
+  T=$(extract_serial_ms "$SERIAL_LOG_FILE")
   printf "Serial run %2d: %s ms\n" "$i" "$T"
   echo "$T" >> "$SERIAL_TIMES_FILE"
 done
@@ -114,7 +106,7 @@ python3 verify.py "scan_N${N_L}.txt"
 echo "[Parallel] warmup + ${N_REPEAT} timed iterations..."
 ./parallel "$N_L" > /dev/null  # warmup
 for i in $(seq 1 ${N_REPEAT}); do
-  LOG="parallel_L_run${i}.log"
+  LOG="$CUDA_LOG_FILE"
   ./parallel "$N_L" > "$LOG"
   T_SCAN=$(extract_cuda_scan_ms "$LOG")
   T_TOTAL=$(extract_cuda_total_ms "$LOG")
@@ -135,7 +127,7 @@ CUDA_SCAN_MIN=$(sort -g "$CUDA_SCAN_TIMES_FILE"  | awk 'NR==1')
 CUDA_SCAN_MAX=$(sort -g "$CUDA_SCAN_TIMES_FILE"  | awk 'END{print}')
 
 echo
-echo "================  Case L summary (N = ${N_L}, 11 runs)  ================"
+echo "================  Case L summary (N = ${N_L}, ${N_REPEAT} runs)  ================"
 printf "Serial      : median = %s ms   [min %s, max %s]\n" \
   "$SERIAL_MEDIAN" "$SERIAL_MIN" "$SERIAL_MAX"
 printf "CUDA scan   : median = %s ms   [min %s, max %s]\n" \
@@ -146,5 +138,5 @@ awk -v s="$SERIAL_MEDIAN" -v c="$CUDA_MEDIAN_SCAN" \
 awk -v s="$SERIAL_MEDIAN" -v c="$CUDA_MEDIAN_TOTAL" \
     'BEGIN { printf "Speedup (incl. D2H) : %.2fx\n", s/c }'
 
-rm -f "$SERIAL_TIMES_FILE" "$CUDA_SCAN_TIMES_FILE" "$CUDA_TOTAL_TIMES_FILE"
+rm -f "$SERIAL_TIMES_FILE" "$CUDA_SCAN_TIMES_FILE" "$CUDA_TOTAL_TIMES_FILE" "$SERIAL_LOG_FILE" "$CUDA_LOG_FILE"
 echo "Done."
