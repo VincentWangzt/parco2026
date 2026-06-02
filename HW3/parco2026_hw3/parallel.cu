@@ -138,17 +138,22 @@ __global__ void block_scan_kernel(const Value* __restrict__ x,
 }
 
 // ---------------------------------------------------------------------------
-// Kernel: add the exclusive-scanned per-block offset back to each element.
-//   y[i] += block_offsets[blockIdx.x]
-// where block_offsets is the EXCLUSIVE scan of block_sums.
+// Kernel: add the per-block offset back to each element.
+//
+// The recursive call leaves `block_inclusive[bid]` containing the inclusive
+// scan of the per-block totals. The *exclusive* offset we actually want is
+//   off = block_inclusive[bid] - block_sums[bid]   (i.e. inclusive - own).
+// We compute this in registers here so we never need a separate
+// inclusive->exclusive kernel.
 // ---------------------------------------------------------------------------
 __global__ void add_block_offsets_kernel(Value* __restrict__ y,
-                                         const Value* __restrict__ block_offsets,
+                                         const Value* __restrict__ block_inclusive,
+                                         const Value* __restrict__ block_sums,
                                          long long N) {
-  long long block_offset_idx = blockIdx.x;
-  Value off = block_offsets[block_offset_idx];
+  int bid = blockIdx.x;
+  Value off = block_inclusive[bid] - block_sums[bid];
 
-  long long base = (long long)blockIdx.x * ELEMENTS_PER_BLOCK;
+  long long base = (long long)bid * ELEMENTS_PER_BLOCK;
   int tid = threadIdx.x;
   long long ai = base + tid;
   long long bi = base + tid + BLOCK_SIZE;
@@ -157,72 +162,58 @@ __global__ void add_block_offsets_kernel(Value* __restrict__ y,
 }
 
 // ---------------------------------------------------------------------------
-// Convert a length-M inclusive scan into an exclusive scan in place.
-// We need this because block_scan_kernel produces an INCLUSIVE scan, but
-// to add the per-block offsets we need the EXCLUSIVE scan of the per-block
-// sums (the offset for block 0 is 0, for block 1 is sum of block 0, etc.).
-//
-// Instead of writing a separate kernel, we save the original per-block sums
-// before the recursive scan and recompute exclusive via:
-//   exclusive[i] = inclusive[i] - original[i]
-// which we fold into add_block_offsets_kernel by passing
-// exclusive_block_sums explicitly.
+// Worst-case workspace size (in Value slots) for an N-element scan.
+// At each level we need 2 * num_blocks slots (block_sums + block_inclusive).
+// The total is bounded by 2 * (N/EPB + N/EPB^2 + ...) <= 2*N/(EPB-1),
+// i.e. tiny next to N itself.
 // ---------------------------------------------------------------------------
-__global__ void incl_to_excl_kernel(Value* __restrict__ excl,
-                                    const Value* __restrict__ incl,
-                                    const Value* __restrict__ original,
-                                    long long M) {
-  long long idx = (long long)blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < M) {
-    excl[idx] = incl[idx] - original[idx];
+static long long scan_workspace_size(long long N) {
+  long long total = 0;
+  long long m = N;
+  while (m > 1) {
+    long long nb = (m + ELEMENTS_PER_BLOCK - 1) / ELEMENTS_PER_BLOCK;
+    total += 2 * nb;
+    m = nb;
   }
+  return total > 0 ? total : 1;  // avoid cudaMalloc(0)
 }
 
 // ---------------------------------------------------------------------------
 // Recursive scan dispatcher.
 //
 // Performs an inclusive scan of `d_in` of length M and writes it to `d_out`.
-// May allocate temporary device memory internally.
+// `workspace` points to a pre-allocated device buffer (sized by
+// scan_workspace_size). `workspace_used` is how many Value slots are
+// already consumed by callers further up the stack, so we slice from the
+// tail. No cudaMalloc/cudaFree on the hot path.
 // ---------------------------------------------------------------------------
-static void inclusive_scan_recursive(const Value* d_in, Value* d_out, long long M) {
+static void inclusive_scan_recursive(const Value* d_in, Value* d_out,
+                                     long long M, Value* workspace,
+                                     long long workspace_used) {
   if (M <= 0) return;
 
   long long num_blocks = (M + ELEMENTS_PER_BLOCK - 1) / ELEMENTS_PER_BLOCK;
 
-  Value* d_block_sums = nullptr;
-  CUDA_CHECK(cudaMalloc(&d_block_sums, num_blocks * sizeof(Value)));
+  // Slice block_sums and block_inclusive from the workspace at this level.
+  Value* d_block_sums = workspace + workspace_used;
+  Value* d_block_inclusive = d_block_sums + num_blocks;
+  long long new_used = workspace_used + 2 * num_blocks;
 
   // Pass 1: per-block inclusive scan; emit per-block totals into d_block_sums.
   block_scan_kernel<<<(int)num_blocks, BLOCK_SIZE>>>(d_in, d_out, d_block_sums, M);
   CUDA_CHECK(cudaGetLastError());
 
-  if (num_blocks <= 1) {
-    cudaFree(d_block_sums);
-    return;
-  }
+  if (num_blocks <= 1) return;
 
-  // Pass 2: scan the per-block totals.
-  Value* d_block_inclusive = nullptr;
-  CUDA_CHECK(cudaMalloc(&d_block_inclusive, num_blocks * sizeof(Value)));
+  // Pass 2: scan the per-block totals (recurse).
+  inclusive_scan_recursive(d_block_sums, d_block_inclusive, num_blocks,
+                           workspace, new_used);
 
-  inclusive_scan_recursive(d_block_sums, d_block_inclusive, num_blocks);
-
-  // Convert inclusive -> exclusive: excl = incl - original.
-  Value* d_block_exclusive = nullptr;
-  CUDA_CHECK(cudaMalloc(&d_block_exclusive, num_blocks * sizeof(Value)));
-  int threads = 256;
-  int blocks = (int)((num_blocks + threads - 1) / threads);
-  incl_to_excl_kernel<<<blocks, threads>>>(d_block_exclusive, d_block_inclusive,
-                                           d_block_sums, num_blocks);
+  // Pass 3: add per-block exclusive offsets, computed in-register from
+  // (inclusive - original) inside the kernel — no separate incl->excl pass.
+  add_block_offsets_kernel<<<(int)num_blocks, BLOCK_SIZE>>>(
+      d_out, d_block_inclusive, d_block_sums, M);
   CUDA_CHECK(cudaGetLastError());
-
-  // Pass 3: add per-block offsets.
-  add_block_offsets_kernel<<<(int)num_blocks, BLOCK_SIZE>>>(d_out, d_block_exclusive, M);
-  CUDA_CHECK(cudaGetLastError());
-
-  cudaFree(d_block_sums);
-  cudaFree(d_block_inclusive);
-  cudaFree(d_block_exclusive);
 }
 
 int main(int argc, char* argv[]) {
@@ -251,6 +242,13 @@ int main(int argc, char* argv[]) {
   CUDA_CHECK(cudaMalloc(&d_x, N * sizeof(Value)));
   CUDA_CHECK(cudaMalloc(&d_y, N * sizeof(Value)));
 
+  // Pre-allocate scan workspace (block_sums + block_inclusive arrays for all
+  // recursion levels, sized once) so the recursive dispatcher does not call
+  // cudaMalloc on the timed path.
+  Value* d_workspace = nullptr;
+  long long workspace_slots = scan_workspace_size(N);
+  CUDA_CHECK(cudaMalloc(&d_workspace, workspace_slots * sizeof(Value)));
+
   // ---- CUDA timing events ----
   cudaEvent_t e_total_start, e_total_stop, e_compute_start, e_compute_stop;
   cudaEventCreate(&e_total_start);
@@ -270,7 +268,7 @@ int main(int argc, char* argv[]) {
 
   // ---- Compute (this is the timed scan kernel chain) ----
   cudaEventRecord(e_compute_start);
-  inclusive_scan_recursive(d_x, d_y, N);
+  inclusive_scan_recursive(d_x, d_y, N, d_workspace, 0);
   cudaEventRecord(e_compute_stop);
 
   // ---- Copy result back ----
@@ -311,6 +309,7 @@ int main(int argc, char* argv[]) {
   cudaEventDestroy(e_compute_stop);
   cudaFree(d_x);
   cudaFree(d_y);
+  cudaFree(d_workspace);
 
   return 0;
 }
