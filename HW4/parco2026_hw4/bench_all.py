@@ -8,12 +8,6 @@ import os, re, statistics, subprocess, sys
 ROOT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(ROOT)
 
-env = os.environ.copy()
-env["PATH"] = "/usr/lib64/openmpi/bin:" + env.get("PATH", "")
-env["LD_LIBRARY_PATH"] = "/usr/lib64/openmpi/lib:" + env.get("LD_LIBRARY_PATH", "")
-env["OMPI_MCA_pml"] = "ob1"
-env["OMPI_MCA_btl"] = "self,vader"
-
 CASES = [("S", 16, 4), ("M", 257, 100), ("L", 1024, 200)]
 RUNS = 11
 TIME_RE = re.compile(r"compute time:\s*([\d.eE+-]+)\s*ms")
@@ -22,7 +16,7 @@ TIME_RE = re.compile(r"compute time:\s*([\d.eE+-]+)\s*ms")
 def time_runs(label, cmd):
     times = []
     for _ in range(RUNS):
-        out = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        out = subprocess.run(cmd, capture_output=True, text=True)
         m = TIME_RE.search(out.stdout)
         if not m:
             print(f"[{label}] no time line:\n{out.stdout}\n{out.stderr}", file=sys.stderr)
@@ -37,8 +31,6 @@ def variants_for(N, T):
         ("mpi_np4",        ["mpirun", "--allow-run-as-root", "-np", "4",  "./parallel_mpi", str(N), str(T)]),
         ("mpi_np16",       ["mpirun", "--allow-run-as-root", "--oversubscribe", "-np", "16", "./parallel_mpi", str(N), str(T)]),
         ("cuda",           ["./parallel_cuda", str(N), str(T)]),
-        ("mpi_cuda_np2",   ["mpirun", "--allow-run-as-root", "-x", "LD_LIBRARY_PATH", "-np", "2", "./parallel_mpi_cuda", str(N), str(T)]),
-        ("mpi_cuda_np4",   ["mpirun", "--allow-run-as-root", "-x", "LD_LIBRARY_PATH", "-np", "4", "./parallel_mpi_cuda", str(N), str(T)]),
     ]
 
 

@@ -3,13 +3,12 @@
 ## 1. 概述
 
 本次作业实现了二维 Conway 生命游戏 (`N×N` 网格、`T` 步迭代、固定死亡边界)
-的三种并行版本：
+的两种并行版本：
 
 | 版本 | 文件 | 说明 |
 |---|---|---|
 | MPI 多进程 | `parallel_mpi.cpp` | 按行划分网格，进程间用 `MPI_Sendrecv` 交换 ghost rows |
 | CUDA 单卡 | `parallel_cuda.cu` | 一个线程负责一个格子，双缓冲指针交换 |
-| MPI + CUDA 混合 | `parallel_mpi_cuda.cu` | 行划分到多个进程，每个进程驱动 GPU 计算并通过 MPI 交换 halo |
 
 初始网格严格使用题目给定的公式
 `grid[i][j] = (((i*131 + j*17 + 7) % 100) < 30)`，所有版本与 `verify.py`
@@ -72,36 +71,14 @@
   `cudaDeviceSynchronize`，再把初始网格重新拷回设备，
   避免把 nvcc JIT/runtime 初始化开销算进 `T` 步迭代时间。
 
-### 2.3 MPI + CUDA 混合实现 (`parallel_mpi_cuda.cu`)
-
-* **划分方式**：仍然 1-D 行划分到 `P` 个 MPI 进程。
-  每个进程拥有自己的 `(local_rows+2) × N` 显存缓冲（双缓冲两份）。
-* **设备选择**：`cudaSetDevice(rank % deviceCount)`。
-  本平台只有一张 T4，因此当 `P > 1` 时所有 rank 共享同一张卡——
-  这种"软件分区"主要演示混合编程模型；当存在多 GPU 时才会真正得到加速。
-* **每步流程**：
-  1. `cudaMemcpy(D2H)` 把当前缓冲的最上一行和最下一行拷到 pinned host 缓冲。
-  2. 两次 `MPI_Sendrecv` 完成 halo 交换；端点 rank 收到的是 0。
-  3. `cudaMemcpy(H2D)` 把 ghost rows 写回到设备缓冲的第 `0` 行 / 第 `local_rows+1` 行。
-  4. 启动 kernel，仅更新行 `1..local_rows`。
-  5. swap 设备指针。
-* **kernel 设计**：
-  * thread block `32 × 8`，使行方向 warp 对齐，提高合并访问；
-  * y 方向加 `+1` 偏移，以确保线程访问的行落在 `[1, local_rows]`，
-    线程 grid 的 y 维只覆盖 `local_rows` 行；
-  * 列方向仍判断 `0 ≤ nj < N` 实现固定死亡边界。
-* **通信开销**：halo 是 `2N` 字节 / 进程 / 步，
-  但每步要做 4 次 `cudaMemcpy`（2 次 D2H + 2 次 H2D），
-  这部分延迟在单 GPU 共享场景下是主要瓶颈。
-
 ---
 
 ## 3. 实验结果
 
 ### 3.1 算例 S （N = 16, T = 4）— 正确性 / 截图 / 可视化
 
-* `serial`、`parallel_mpi -np 4`、`parallel_cuda`、`parallel_mpi_cuda -np 4`
-  四种实现产生的最终 16×16 网格 **完全一致**（见 `case_S_run.log`），
+* `serial`、`parallel_mpi -np 4`、`parallel_cuda` 三种实现产生的最终
+  16×16 网格 **完全一致**（见 `case_S_run.log`），
   且 `verify.py` 输出 `PASS, live cells = 39`。
 * 可视化：`python3 visual.py life_N16_T4.txt life_N16_T4.png` 生成
   512×512 黑白图（黑=活、白=死），见 `life_N16_T4.png`。
@@ -113,9 +90,9 @@ PASS: final grid matches the reference for N=257, T=100.
       live cells = 155
 ```
 
-序列、MPI、CUDA、MPI+CUDA 四个版本的输出 `life_N257_T100.txt`
+序列、MPI、CUDA 三个版本的输出 `life_N257_T100.txt`
 全部通过 `verify.py`（详见 `case_M_run.log`）。
-`N=257` 不能被 4 / 16 / 2 整除，验证了 1-D 行划分中
+`N=257` 不能被 4 / 16 整除，验证了 1-D 行划分中
 "余数行分配给前若干 rank"这一逻辑的正确性。
 
 ### 3.3 算例 L （N = 1024, T = 200）— 性能与加速比
@@ -128,8 +105,6 @@ PASS: final grid matches the reference for N=257, T=100.
 | parallel_mpi      | -np 4                  | **90.94**   | **33.6×** |
 | parallel_mpi      | -np 16 (`--oversubscribe`) | **41.72** | **73.3×** |
 | parallel_cuda     | 1×T4，block 16×16      | **5.95**    | **514.4×** |
-| parallel_mpi_cuda | -np 2，共享 1×T4        | **77.19**   | 39.6× |
-| parallel_mpi_cuda | -np 4，共享 1×T4        | **160.37**  | 19.1× |
 
 > 速度比 = 串行时间 ÷ 该版本时间（中位数对中位数）。
 
@@ -149,14 +124,6 @@ PASS: final grid matches the reference for N=257, T=100.
   ② 16 进程下每个 rank 只剩 64 行，有较大的相对边界比，
   ③ 系统上只有 4 个物理 ntasks，`-np 16` 是 oversubscribe，
   超出物理核数后扩展性变差。
-* **MPI+CUDA 在单 GPU 上反而变慢**：
-  当所有 rank 共享同一张 T4 时，每步要做 `4P` 次小尺寸 `cudaMemcpy`
-  和 `2P` 次 `Sendrecv`；而单 GPU 实际计算量并未被切分。
-  实测 `np=4` 比 `np=2` 还要慢，因为通信与拷贝随 P 线性增长，
-  但 GPU 仍然是同一份硬件。
-  这一点正是混合并行的现实约束：**MPI+CUDA 的优势要在多张 GPU
-  上才会显现**——比如 4 节点各 1 张 GPU，halo 通信能掩盖在
-  CUDA 计算之后；单卡场景下纯 CUDA 才是最优解。
 * **小规模 (S) 上并行反而变慢**：`N=16, T=4` 的串行只需 ~20 µs，
   fork/启动 + MPI 初始化 + GPU 上下文创建本身就要数百 µs ~ 数 ms，
   所以加速比 < 1，这是正常现象，仅用于检验正确性。
@@ -171,16 +138,15 @@ parco2026_hw4/
 ├── serial.cpp                 # 串行实现（题目给定）
 ├── parallel_mpi.cpp           # MPI 实现
 ├── parallel_cuda.cu           # CUDA 实现
-├── parallel_mpi_cuda.cu       # MPI + CUDA 混合实现（加分项）
-├── Makefile                   # 编译四个可执行文件
+├── Makefile                   # 编译三个可执行文件
 ├── run.slurm                  # 在 slurm 上跑全部算例的脚本
 ├── verify.py                  # 题目自带验证脚本
 ├── visual.py                  # 把输出 .txt 渲染为 PNG
 ├── bench.py                   # 单算例 (L) 11 次中位数 benchmark
-├── bench_all.py               # 三个算例 × 6 配置 × 11 次中位数 benchmark
+├── bench_all.py               # 三个算例 × 4 配置 × 11 次中位数 benchmark
 ├── results.txt                # bench_all.py 输出（含原始 11 次时间）
-├── case_S_run.log             # 算例 S 四种实现的运行日志（含截图素材）
-├── case_M_run.log             # 算例 M 四种实现 + verify 的运行日志
+├── case_S_run.log             # 算例 S 三种实现的运行日志（含截图素材）
+├── case_M_run.log             # 算例 M 三种实现 + verify 的运行日志
 ├── life_N16_T4.txt            # 算例 S 最终网格
 ├── life_N16_T4.png            # 算例 S 可视化
 ├── life_N257_T100.txt         # 算例 M 最终网格
@@ -191,13 +157,11 @@ parco2026_hw4/
 ## 6. 复现命令
 
 ```bash
-make                                              # 编译 serial + 三个并行版本
+make                                              # 编译 serial + 两个并行版本
 ./serial 16 4 && python3 verify.py life_N16_T4.txt
 mpirun --allow-run-as-root -np 4 ./parallel_mpi 257 100
 python3 verify.py life_N257_T100.txt              # 期望 PASS
 ./parallel_cuda 1024 200                          # 单卡 CUDA
-mpirun --allow-run-as-root -x LD_LIBRARY_PATH \
-      -np 2 ./parallel_mpi_cuda 1024 200          # MPI+CUDA
 python3 bench_all.py                              # 11 次中位数 benchmark
 python3 visual.py life_N16_T4.txt life_N16_T4.png # 可视化
 ```

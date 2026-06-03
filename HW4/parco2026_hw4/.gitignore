@@ -2,7 +2,6 @@
 serial
 parallel_mpi
 parallel_cuda
-parallel_mpi_cuda
 
 # Object / build artifacts
 *.o

@@ -45,7 +45,6 @@ grid[i][j] = 0  otherwise
 - 至少完成以下并行实现之一：
   - `parallel_cuda.cu`：CUDA 单卡实现；
   - `parallel_mpi.cpp`：MPI 多进程实现。
-- 鼓励完成 MPI+CUDA 混合版本作为加分项，但不强制。
 - CUDA 实现建议：
   1. 一个线程负责一个格子；
   2. 使用两个网格数组做双缓冲；
