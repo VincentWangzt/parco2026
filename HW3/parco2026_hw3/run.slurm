@@ -15,11 +15,10 @@
 #     sbatch run.slurm
 #
 # This script
-#   1. Loads CUDA / GCC modules (best-effort; harmless if absent).
-#   2. (Re)builds `serial` and `parallel`.
-#   3. Runs the three required cases (S, M, L).
-#   4. Verifies S and M with verify.py.
-#   5. For case L, repeats BOTH serial and parallel 11 times (parallel has
+#   1. (Re)builds `serial` and `parallel`.
+#   2. Runs the three required cases (S, M, L).
+#   3. Verifies S and M with verify.py.
+#   4. For case L, repeats BOTH serial and parallel 11 times (parallel has
 #      one extra warm-up run). Takes the MEDIAN of the 11 timings, which
 #      is robust to one or two stray outliers and does not require throwing
 #      away samples by hand. Reports the speedup vs. that median.
@@ -61,6 +60,10 @@ run_case() {
   # Serial
   local SERIAL_LOG="serial_N${N}.log"
   ./serial "$N" | tee "$SERIAL_LOG"
+
+  if [ -f "scan_N${N}.txt" ]; then
+    rm -f scan_N${N}.txt
+  fi
 
   # Parallel
   local CUDA_LOG="parallel_N${N}.log"
