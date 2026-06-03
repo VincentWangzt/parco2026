@@ -1,0 +1,53 @@
+# Compiled binaries (built by Makefile)
+serial
+parallel_mpi
+parallel_cuda
+parallel_mpi_cuda
+
+# Object / build artifacts
+*.o
+*.obj
+*.a
+*.so
+*.exe
+
+# CUDA / nvcc intermediates
+*.ptx
+*.cubin
+*.fatbin
+*.i
+*.ii
+*.gpu
+*.cudafe*
+
+# Generated grid outputs
+life_N*_T*.txt
+life_N*_T*.png
+# Run logs / benchmark output
+results.txt
+case_*_run.log
+job_*.out
+slurm-*.out
+*.log
+
+# Editor / OS junk
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Misc
+*.bak
+*.tmp
+core
