@@ -6,7 +6,7 @@ EXES = serial parallel
 all: $(EXES)
 
 serial: serial.cpp
-	$(CXX) -O2 -o $@ $^
+	$(CXX) -O3 -o $@ $^
 
 parallel: parallel.cu
 	$(NVCC) -O3 -o $@ $^
