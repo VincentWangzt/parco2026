@@ -31,3 +31,16 @@ verify: PASS / PASS / PASS (S/M/L)
 decision: baseline reference
 
 ---
+
+## M1 — halo-padded MPI inner kernel (N+2 stride, drop jl/jr branches)
+serial    = 3130.5  ms
+mpi_np1   = 331.596 ms  (Δ -5.6%)
+mpi_np2   = 168.91  ms  (Δ -5.4%)
+mpi_np4   = 92.71   ms  (Δ -11.0%)  ← clears 10% gate
+mpi_np8   = 82.1487 ms  (Δ -4.6%)
+mpi_np16  = 41.2978 ms  (Δ -1.3%)
+cuda      = 5.25532 ms  (untouched)
+verify: PASS / PASS / PASS
+decision: KEEP — clear inner-kernel win at mpi_np4; no regressions
+
+---
