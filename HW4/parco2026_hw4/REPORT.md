@@ -20,9 +20,12 @@
 * GPU：NVIDIA Tesla T4（16 GB），CUDA 12.2
 * OpenMPI 4.1.1，g++ 8.5.0，nvcc 12.x，`-O3 -arch=sm_60`
 
-时间测量方式：每个版本针对每个算例运行 **11 次**，记录每次内核计算时间
+时间测量方式：算例 L 下每个版本运行 **11 次**，记录每次内核计算时间
 （串行/MPI 用 `std::chrono`，CUDA 在 `cudaDeviceSynchronize` 前后取时间），
 取 **中位数** 作为最终运行时间，并以串行中位数为基准计算加速比。
+算例 S、M 只跑一次用于正确性验证（`verify.py`）。整套流程已经直接
+集成到 `run.slurm`，原始每次的时间和最终中位数都打印到 SLURM 的
+`job_<id>_<node>.out` 日志中，不再写入单独的 `results.txt`。
 
 ---
 
@@ -97,7 +100,9 @@ PASS: final grid matches the reference for N=257, T=100.
 
 ### 3.3 算例 L （N = 1024, T = 200）— 性能与加速比
 
-每个版本运行 **11 次**，取中位数（单位 ms）。完整日志见 `results.txt`。
+每个版本运行 **11 次**，取中位数（单位 ms）。原始每次运行的时间以及
+中位数 / 加速比汇总都直接打印在 `run.slurm` 的 SLURM 日志
+`job_<id>_<node>.out` 里（"Case L benchmark" 与 "Case L summary" 两节）。
 
 | 实现 | 进程/线程配置 | 运行时间 (中位数, ms) | 加速比 |
 |---|---|---:|---:|
@@ -108,9 +113,9 @@ PASS: final grid matches the reference for N=257, T=100.
 
 > 速度比 = 串行时间 ÷ 该版本时间（中位数对中位数）。
 
-各算例下中位数的完整数据见 `results.txt`。
-为了让数据更稳定，每次单独 fork 一个新进程跑一次，
-取中位数后能屏蔽冷启动、调度抖动以及 mpirun 启动开销带来的离群点。
+每次单独 fork 一个新进程跑一次，取中位数后能屏蔽冷启动、调度抖动以及
+mpirun 启动开销带来的离群点。原始每次运行的时间以及上面这张汇总表
+都直接来自 `run.slurm` 的 SLURM 日志输出。
 
 ---
 
@@ -139,12 +144,10 @@ parco2026_hw4/
 ├── parallel_mpi.cpp           # MPI 实现
 ├── parallel_cuda.cu           # CUDA 实现
 ├── Makefile                   # 编译三个可执行文件
-├── run.slurm                  # 在 slurm 上跑全部算例的脚本
+├── run.slurm                  # 在 slurm 上跑全部算例 + 算例 L benchmark 的脚本
 ├── verify.py                  # 题目自带验证脚本
 ├── visual.py                  # 把输出 .txt 渲染为 PNG
-├── bench.py                   # 单算例 (L) 11 次中位数 benchmark
-├── bench_all.py               # 三个算例 × 4 配置 × 11 次中位数 benchmark
-├── results.txt                # bench_all.py 输出（含原始 11 次时间）
+├── bench.py                   # 单算例 (L) 11 次中位数 benchmark（旧 Python 版，已不再被 run.slurm 调用）
 ├── case_S_run.log             # 算例 S 三种实现的运行日志（含截图素材）
 ├── case_M_run.log             # 算例 M 三种实现 + verify 的运行日志
 ├── life_N16_T4.txt            # 算例 S 最终网格
@@ -157,11 +160,7 @@ parco2026_hw4/
 ## 6. 复现命令
 
 ```bash
-make                                              # 编译 serial + 两个并行版本
-./serial 16 4 && python3 verify.py life_N16_T4.txt
-mpirun --allow-run-as-root -np 4 ./parallel_mpi 257 100
-python3 verify.py life_N257_T100.txt              # 期望 PASS
-./parallel_cuda 1024 200                          # 单卡 CUDA
-python3 bench_all.py                              # 11 次中位数 benchmark
-python3 visual.py life_N16_T4.txt life_N16_T4.png # 可视化
+make                  # 编译 serial + 两个并行版本
+sbatch run.slurm      # 在 slurm 上一次跑完 S/M 验证 + L benchmark；输出落在 job_<id>_<node>.out
+bash   run.slurm      # 等价的本地复现：#SBATCH 行只是注释，bash 会忽略
 ```

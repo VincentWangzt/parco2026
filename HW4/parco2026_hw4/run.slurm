@@ -3,42 +3,116 @@
 #SBATCH -p gpu
 #SBATCH -J hw4_life
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=4
+#SBATCH --ntasks-per-node=16
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=1
 #SBATCH -t 30:00
 
-# Assumes the cluster's module system (or pre-existing PATH/LD_LIBRARY_PATH)
-# already provides mpirun, libmpi, and nvcc. If not, `module load openmpi cuda`
-# (or the equivalent) before sbatch.
+set -euo pipefail
+cd "$(dirname "$0")"
 
-# 算例 S：小规模，用于正确性截图和可视化
-echo "==== Case S serial ===="
-./serial 16 4
-python3 verify.py life_N16_T4.txt
-python3 visual.py life_N16_T4.txt life_N16_T4.png
+RUNS=${RUNS:-11}
 
-echo "==== Case S MPI -np 4 ===="
-mpirun --allow-run-as-root -np 4 ./parallel_mpi 16 4
-python3 verify.py life_N16_T4.txt
+# Pretty banner, repeated for every variant inside every case.
+banner() { echo; echo "==== $* ===="; }
 
-echo "==== Case S CUDA ===="
-./parallel_cuda 16 4
-python3 verify.py life_N16_T4.txt
+# Run one variant on one (N, T) case and verify the output grid against
+# the serial reference produced earlier in the same case block.
+run_variant() {
+    local label=$1 N=$2 T=$3
+    shift 3
+    banner "$label  (N=$N, T=$T)"
+    rm -f "life_N${N}_T${T}.txt"
+    "$@"
+    if [[ ! -f "life_N${N}_T${T}.txt" ]]; then
+        echo "ERROR: [$label] output file life_N${N}_T${T}.txt not found" >&2
+        exit 1
+    fi
+    python3 verify.py "life_N${N}_T${T}.txt"
+}
 
-# 算例 M：非整除规模，用于自动验证
-echo "==== Case M serial ===="
-./serial 257 100
-python3 verify.py life_N257_T100.txt
+make clean
+make
 
-echo "==== Case M MPI -np 4 ===="
-mpirun --allow-run-as-root -np 4 ./parallel_mpi 257 100
-python3 verify.py life_N257_T100.txt
+# ---- Case S : small grid, used for the screenshot ----------
+N=16; T=4
+run_variant "Case S serial"       $N $T ./serial $N $T
+run_variant "Case S MPI -np 4"    $N $T mpirun -np 4 ./parallel_mpi $N $T
+run_variant "Case S CUDA"         $N $T ./parallel_cuda $N $T
 
-echo "==== Case M CUDA ===="
-./parallel_cuda 257 100
-python3 verify.py life_N257_T100.txt
+# ---- Case M : non-divisible grid, exercises the row-remainder logic --------
+N=257; T=100
+run_variant "Case M serial"       $N $T ./serial $N $T
+run_variant "Case M MPI -np 4"    $N $T mpirun -np 4 ./parallel_mpi $N $T
+run_variant "Case M CUDA"         $N $T ./parallel_cuda $N $T
 
-# 算例 L：性能测试，记录串行时间、并行时间和加速比
-echo "==== Case L benchmarks (median over 11 runs) ===="
-python3 bench_all.py
+# ---- Case L : full benchmark sweep -----------------------------------------
+# Each variant is timed RUNS times; raw per-run lines are printed verbatim,
+# and a single median + speedup-vs-serial is reported at the end.
+
+# pull the numeric ms value out of a "<...> compute time: <X> ms" line
+extract_ms() {
+    awk '{ for (k = 1; k <= NF; k++) if ($k == "ms") { print $(k - 1); exit } }'
+}
+
+# median of newline-separated numbers on stdin
+median() {
+    sort -g | awk '
+        { a[NR] = $1 }
+        END {
+            if (NR == 0) { exit 1 }
+            if (NR % 2)  { print a[(NR + 1) / 2] }
+            else         { printf "%.6f\n", (a[NR / 2] + a[NR / 2 + 1]) / 2 }
+        }'
+}
+
+# args: label cmd...
+bench_variant() {
+    local label=$1
+    shift
+    local cmd=("$@")
+
+    local tmp
+    tmp=$(mktemp)
+    local i line t
+    for ((i = 1; i <= RUNS; i++)); do
+        line=$("${cmd[@]}" 2>/dev/null | grep "compute time:" || true)
+        if [[ -z $line ]]; then
+            echo "[$label] no compute-time line on run $i" >&2
+            rm -f "$tmp"
+            exit 1
+        fi
+        t=$(extract_ms <<<"$line")
+        printf 'Case L %-9s run %2d: %s ms\n' "$label" "$i" "$t"
+        printf '%s\n' "$t" >>"$tmp"
+    done
+
+    local med
+    med=$(median <"$tmp")
+    rm -f "$tmp"
+    eval "MED_${label}=\$med"
+}
+
+banner "Case L benchmark (raw timings, $RUNS runs per variant)"
+N=1024; T=200
+bench_variant serial   ./serial "$N" "$T"
+bench_variant mpi_np4  mpirun -np 4 ./parallel_mpi "$N" "$T"
+bench_variant mpi_np16 mpirun -np 16 ./parallel_mpi "$N" "$T"
+bench_variant cuda     ./parallel_cuda "$N" "$T"
+
+# Per-case summary: one median + speedup line per variant.
+banner "Case L summary"
+base=$MED_serial
+for label in serial mpi_np4 mpi_np16 cuda; do
+    med=$(eval echo "\$MED_$label")
+    sp=$(awk -v b="$base" -v m="$med" 'BEGIN { printf "%.2f", b / m }')
+    printf 'Case L %s: median=%s ms, speedup=%sx\n' "$label" "$med" "$sp"
+done
+
+# Final recap (same numbers, kept as the last block of the job log).
+banner "Final summary"
+for label in serial mpi_np4 mpi_np16 cuda; do
+    med=$(eval echo "\$MED_$label")
+    sp=$(awk -v b="$base" -v m="$med" 'BEGIN { printf "%.2f", b / m }')
+    printf 'Case L %s: median=%s ms, speedup=%sx\n' "$label" "$med" "$sp"
+done
