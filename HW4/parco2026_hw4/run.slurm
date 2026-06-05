@@ -96,6 +96,7 @@ bench_variant() {
 banner "Case L benchmark (raw timings, $RUNS runs per variant)"
 N=1024; T=200
 bench_variant serial   ./serial "$N" "$T"
+bench_variant mpi_np1  mpirun -np 1 ./parallel_mpi "$N" "$T"
 bench_variant mpi_np4  mpirun -np 4 ./parallel_mpi "$N" "$T"
 bench_variant mpi_np16 mpirun -np 16 ./parallel_mpi "$N" "$T"
 bench_variant cuda     ./parallel_cuda "$N" "$T"
@@ -103,7 +104,7 @@ bench_variant cuda     ./parallel_cuda "$N" "$T"
 # Per-case summary: one median + speedup line per variant.
 banner "Case L summary"
 base=$MED_serial
-for label in serial mpi_np4 mpi_np16 cuda; do
+for label in serial mpi_np1 mpi_np4 mpi_np16 cuda; do
     med=$(eval echo "\$MED_$label")
     sp=$(awk -v b="$base" -v m="$med" 'BEGIN { printf "%.2f", b / m }')
     printf 'Case L %s: median=%s ms, speedup=%sx\n' "$label" "$med" "$sp"
