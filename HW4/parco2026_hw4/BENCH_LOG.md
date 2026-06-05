@@ -95,3 +95,13 @@ decision: DROP — adds an extra 4 bytes of padding on each row and a stride
           form. Plus an extra cudaMemcpy to clear d_next's outer ring.
 
 ---
+
+## C3 — CUDA shared-memory tiling (BX=BY=16, halo loaded into __shared__)
+cuda      = 8.25059 ms (Δ +57% regression vs M1's 5.255)
+verify: PASS / PASS / PASS
+decision: DROP — heavy regression. T4's L1/texture cache already absorbed
+          the redundant 8-neighbour reads; halo-load branches at block
+          edges hurt warp uniformity, and the __syncthreads() drains the
+          short kernel.
+
+---
