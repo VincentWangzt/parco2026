@@ -36,47 +36,26 @@ inline int init_cell(int i, int j) {
   return ((i * 131 + j * 17 + 7) % 100) < 30 ? 1 : 0;
 }
 
-// Shared-memory tiling: each block of BX*BY threads loads a (BY+2)x(BX+2)
-// tile (its cells plus a 1-cell halo) into __shared__ memory once, then every
-// thread reads its 9 neighbours from shared memory rather than global memory.
-// Halo cells outside the global grid are loaded as 0 (fixed dead boundary).
-template <int BX, int BY>
 __global__ void life_step_kernel(const unsigned char* __restrict__ in,
                                  unsigned char* __restrict__ out, int N) {
-  __shared__ unsigned char tile[BY + 2][BX + 2];
-
-  int j = blockIdx.x * BX + threadIdx.x;  // global column
-  int i = blockIdx.y * BY + threadIdx.y;  // global row
-  int tx = threadIdx.x + 1;               // tile-local column [1, BX]
-  int ty = threadIdx.y + 1;               // tile-local row    [1, BY]
-
-  auto load = [&](int gi, int gj) -> unsigned char {
-    return (gi >= 0 && gi < N && gj >= 0 && gj < N) ? in[gi * N + gj]
-                                                    : (unsigned char)0;
-  };
-
-  // Center cell.
-  tile[ty][tx] = load(i, j);
-  // Top / bottom halo rows.
-  if (threadIdx.y == 0)        tile[0][tx]      = load(i - 1, j);
-  if (threadIdx.y == BY - 1)   tile[BY + 1][tx] = load(i + 1, j);
-  // Left / right halo cols.
-  if (threadIdx.x == 0)        tile[ty][0]      = load(i, j - 1);
-  if (threadIdx.x == BX - 1)   tile[ty][BX + 1] = load(i, j + 1);
-  // 4 corners.
-  if (threadIdx.x == 0      && threadIdx.y == 0)      tile[0][0]           = load(i - 1, j - 1);
-  if (threadIdx.x == BX - 1 && threadIdx.y == 0)      tile[0][BX + 1]      = load(i - 1, j + 1);
-  if (threadIdx.x == 0      && threadIdx.y == BY - 1) tile[BY + 1][0]      = load(i + 1, j - 1);
-  if (threadIdx.x == BX - 1 && threadIdx.y == BY - 1) tile[BY + 1][BX + 1] = load(i + 1, j + 1);
-
-  __syncthreads();
-
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
   if (i >= N || j >= N) return;
 
-  int cnt = tile[ty - 1][tx - 1] + tile[ty - 1][tx] + tile[ty - 1][tx + 1]
-          + tile[ty    ][tx - 1]                    + tile[ty    ][tx + 1]
-          + tile[ty + 1][tx - 1] + tile[ty + 1][tx] + tile[ty + 1][tx + 1];
-  int alive = tile[ty][tx];
+  int cnt = 0;
+#pragma unroll
+  for (int di = -1; di <= 1; ++di) {
+#pragma unroll
+    for (int dj = -1; dj <= 1; ++dj) {
+      if (di == 0 && dj == 0) continue;
+      int ni = i + di;
+      int nj = j + dj;
+      if (ni >= 0 && ni < N && nj >= 0 && nj < N) {
+        cnt += in[ni * N + nj];
+      }
+    }
+  }
+  int alive = in[i * N + j];
   out[i * N + j] =
       (unsigned char)((alive ? (cnt == 2 || cnt == 3) : (cnt == 3)) ? 1 : 0);
 }
@@ -118,19 +97,18 @@ int main(int argc, char* argv[]) {
   CUDA_CHECK(cudaMalloc(&d_next, bytes));
   CUDA_CHECK(cudaMemcpy(d_current, host.data(), bytes, cudaMemcpyHostToDevice));
 
-  constexpr int BX = 16, BY = 16;
-  dim3 block(BX, BY);
-  dim3 grid((N + BX - 1) / BX, (N + BY - 1) / BY);
+  dim3 block(16, 16);
+  dim3 grid((N + block.x - 1) / block.x, (N + block.y - 1) / block.y);
 
   // Warm-up to surface init / JIT cost.
-  life_step_kernel<BX, BY><<<grid, block>>>(d_current, d_next, N);
+  life_step_kernel<<<grid, block>>>(d_current, d_next, N);
   CUDA_CHECK(cudaDeviceSynchronize());
   // Reset state after warm-up: re-upload the initial grid.
   CUDA_CHECK(cudaMemcpy(d_current, host.data(), bytes, cudaMemcpyHostToDevice));
 
   auto t0 = std::chrono::high_resolution_clock::now();
   for (int step = 0; step < T; ++step) {
-    life_step_kernel<BX, BY><<<grid, block>>>(d_current, d_next, N);
+    life_step_kernel<<<grid, block>>>(d_current, d_next, N);
     std::swap(d_current, d_next);
   }
   CUDA_CHECK(cudaDeviceSynchronize());
