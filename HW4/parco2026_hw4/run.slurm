@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -o job_%j_%N.out
+#SBATCH -o job_%j.out
 #SBATCH -p gpu
 #SBATCH -J hw4_life
 #SBATCH --nodes=1
@@ -9,7 +9,14 @@
 #SBATCH -t 30:00
 
 set -euo pipefail
-cd "$(dirname "$0")"
+
+echo "=== node:    $(hostname)"
+echo "=== date:    $(date)"
+echo "=== nproc:   $(nproc)"
+echo "=== nvcc:    $(command -v nvcc || echo 'NOT FOUND')"
+nvcc --version 2>/dev/null | tail -1 || true
+nvidia-smi 2>/dev/null | head -20 || true
+echo
 
 RUNS=${RUNS:-11}
 
