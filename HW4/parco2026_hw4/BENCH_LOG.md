@@ -105,3 +105,22 @@ decision: DROP — heavy regression. T4's L1/texture cache already absorbed
           short kernel.
 
 ---
+
+## C5 — CUDA block-size sweep (winner: 32x4)
+Local 11-run median sweep at N=1024, T=200 (medians, ms):
+  block 32x4  : 3.17358   <- WINNER
+  block 32x8  : 3.94748
+  block 32x16 : 4.09407
+  block 16x8  : 5.29995
+  block 16x16 : 5.34059   (old default)
+  block 16x32 : 5.55952
+  block 8x32  : 9.59802
+  block 8x16  : 9.63123
+  block 8x8   : 9.65136
+With 32x4 baked into run.slurm bench (21 runs):
+  cuda      = 3.17643 ms (Δ -39.6% vs M1's 5.255, speedup vs serial 978x)
+verify: PASS / PASS / PASS
+decision: KEEP — clear and large win. 32 threads in x = a warp doing fully
+          coalesced byte loads; 4 rows = 4 warps/block keeps occupancy good.
+
+---
