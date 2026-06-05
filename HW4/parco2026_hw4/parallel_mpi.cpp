@@ -133,7 +133,9 @@ int main(int argc, char* argv[]) {
 
     // Update local rows. With ghost cols pinned at zero we can drop the
     // jl/jr branches: the loop body is a flat 8-add reduction the compiler
-    // can vectorise.
+    // can vectorise. OpenMP parallelises across rows; each thread writes a
+    // disjoint slice of `next` so no synchronisation is needed.
+#pragma omp parallel for schedule(static)
     for (int i = 1; i <= local_rows; ++i) {
       const unsigned char* up_r = &current[(i - 1) * stride];
       const unsigned char* mid  = &current[i * stride];

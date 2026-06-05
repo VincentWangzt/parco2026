@@ -44,13 +44,13 @@ make
 # ---- Case S : small grid, used for the screenshot ----------
 N=16; T=4
 run_variant "Case S serial"       $N $T ./serial $N $T
-run_variant "Case S MPI -np 4"    $N $T mpirun -np 4 ./parallel_mpi $N $T
+run_variant "Case S MPI -np 4"    $N $T env OMP_NUM_THREADS=1 mpirun -np 4 ./parallel_mpi $N $T
 run_variant "Case S CUDA"         $N $T ./parallel_cuda $N $T
 
 # ---- Case M : non-divisible grid, exercises the row-remainder logic --------
 N=257; T=100
 run_variant "Case M serial"       $N $T ./serial $N $T
-run_variant "Case M MPI -np 4"    $N $T mpirun -np 4 ./parallel_mpi $N $T
+run_variant "Case M MPI -np 4"    $N $T env OMP_NUM_THREADS=1 mpirun -np 4 ./parallel_mpi $N $T
 run_variant "Case M CUDA"         $N $T ./parallel_cuda $N $T
 
 # ---- Case L : full benchmark sweep -----------------------------------------
@@ -103,17 +103,28 @@ bench_variant() {
 banner "Case L benchmark (raw timings, $RUNS runs per variant)"
 N=1024; T=200
 bench_variant serial   ./serial "$N" "$T"
-bench_variant mpi_np1  mpirun -np 1 ./parallel_mpi "$N" "$T"
-bench_variant mpi_np2  mpirun -np 2 ./parallel_mpi "$N" "$T"
-bench_variant mpi_np4  mpirun -np 4 ./parallel_mpi "$N" "$T"
-bench_variant mpi_np8  mpirun -np 8 ./parallel_mpi "$N" "$T"
-bench_variant mpi_np16 mpirun -np 16 ./parallel_mpi "$N" "$T"
+# Pure-MPI variants: pin each rank to one thread (binary is OpenMP-enabled,
+# default would otherwise spawn $nproc threads per rank).
+bench_variant mpi_np1  env OMP_NUM_THREADS=1 mpirun -np 1  ./parallel_mpi "$N" "$T"
+bench_variant mpi_np2  env OMP_NUM_THREADS=1 mpirun -np 2  ./parallel_mpi "$N" "$T"
+bench_variant mpi_np4  env OMP_NUM_THREADS=1 mpirun -np 4  ./parallel_mpi "$N" "$T"
+bench_variant mpi_np8  env OMP_NUM_THREADS=1 mpirun -np 8  ./parallel_mpi "$N" "$T"
+bench_variant mpi_np16 env OMP_NUM_THREADS=1 mpirun -np 16 ./parallel_mpi "$N" "$T"
+
+# Hybrid MPI + OpenMP variants. P*T must stay <= 16 CPU budget.
+# (Open MPI binds each rank to one core by default which would starve
+# OpenMP threads, so we relax binding with --bind-to none.)
+bench_variant mpi_p1_t16  env OMP_NUM_THREADS=16 mpirun --bind-to none -np 1  ./parallel_mpi "$N" "$T"
+bench_variant mpi_p2_t8   env OMP_NUM_THREADS=8  mpirun --bind-to none -np 2  ./parallel_mpi "$N" "$T"
+bench_variant mpi_p4_t4   env OMP_NUM_THREADS=4  mpirun --bind-to none -np 4  ./parallel_mpi "$N" "$T"
+bench_variant mpi_p8_t2   env OMP_NUM_THREADS=2  mpirun --bind-to none -np 8  ./parallel_mpi "$N" "$T"
+
 bench_variant cuda     ./parallel_cuda "$N" "$T"
 
 # Per-case summary: one median + speedup line per variant.
 banner "Case L summary"
 base=$MED_serial
-for label in serial mpi_np1 mpi_np2 mpi_np4 mpi_np8 mpi_np16 cuda; do
+for label in serial mpi_np1 mpi_np2 mpi_np4 mpi_np8 mpi_np16 mpi_p1_t16 mpi_p2_t8 mpi_p4_t4 mpi_p8_t2 cuda; do
     med=$(eval echo "\$MED_$label")
     sp=$(awk -v b="$base" -v m="$med" 'BEGIN { printf "%.2f", b / m }')
     printf 'Case L %s: median=%s ms, speedup=%sx\n' "$label" "$med" "$sp"

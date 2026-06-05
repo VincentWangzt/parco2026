@@ -57,3 +57,24 @@ decision: DROP — overlap does not pay off when MPI is already on shared-memory
           (vader) BTL; comm is cheap, interior-row split adds cache pollution.
 
 ---
+
+## M3 — hybrid MPI + OpenMP (#pragma omp parallel for over rows)
+serial    = 3116.39 ms
+mpi_np1   = 332.917 ms  (pure MPI, OMP_NUM_THREADS=1)
+mpi_np16  = 41.3805 ms
+mpi_p1_t16  = 43.2765 ms   (1 rank × 16 OMP threads — best hybrid)
+mpi_p2_t8   = 44.0003 ms
+mpi_p4_t4   = 44.8177 ms
+mpi_p8_t2   = 46.216  ms
+cuda      = 5.2536 ms
+verify: PASS / PASS / PASS
+decision: DROP — every hybrid config is SLOWER than pure mpi_np16.
+          200 OMP fork/join cycles per run cost more than the pure-MPI
+          shared-memory comm they replace. Headline mpi_np16 stays the best
+          CPU configuration.
+NOTE: must keep `OMP_NUM_THREADS=1` for pure-MPI variants because the binary
+      is built with -fopenmp; we'll need this even after reverting if the
+      revert keeps -fopenmp. Plan: revert both code change AND -fopenmp flag
+      so the rest of the exploration goes back to a clean MPI build.
+
+---
