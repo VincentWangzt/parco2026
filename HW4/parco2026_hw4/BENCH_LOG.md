@@ -78,3 +78,11 @@ NOTE: must keep `OMP_NUM_THREADS=1` for pure-MPI variants because the binary
       so the rest of the exploration goes back to a clean MPI build.
 
 ---
+
+## C1 — CUDA __ldg read-only loads on input buffer
+cuda      = 5.24064 ms (Δ -0.4% vs M1's 5.255)
+verify: PASS / PASS / PASS
+decision: DROP — sm_60 already auto-routes const __restrict__ pointer loads
+          through the read-only cache; the explicit __ldg is a wash.
+
+---
