@@ -10,7 +10,7 @@ serial: serial.cpp
 	$(CXX) -O2 -o $@ $^
 
 parallel_mpi: parallel_mpi.cpp
-	$(MPICXX) -O3 -fopenmp -o $@ $^
+	$(MPICXX) -O3 -o $@ $^
 
 parallel_cuda: parallel_cuda.cu
 	$(NVCC) -O3 -arch=sm_60 -o $@ $^
