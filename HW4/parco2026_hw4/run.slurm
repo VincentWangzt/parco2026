@@ -108,11 +108,3 @@ for label in serial mpi_np4 mpi_np16 cuda; do
     sp=$(awk -v b="$base" -v m="$med" 'BEGIN { printf "%.2f", b / m }')
     printf 'Case L %s: median=%s ms, speedup=%sx\n' "$label" "$med" "$sp"
 done
-
-# Final recap (same numbers, kept as the last block of the job log).
-banner "Final summary"
-for label in serial mpi_np4 mpi_np16 cuda; do
-    med=$(eval echo "\$MED_$label")
-    sp=$(awk -v b="$base" -v m="$med" 'BEGIN { printf "%.2f", b / m }')
-    printf 'Case L %s: median=%s ms, speedup=%sx\n' "$label" "$med" "$sp"
-done
