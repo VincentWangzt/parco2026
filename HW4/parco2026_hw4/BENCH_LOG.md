@@ -86,3 +86,12 @@ decision: DROP — sm_60 already auto-routes const __restrict__ pointer loads
           through the read-only cache; the explicit __ldg is a wash.
 
 ---
+
+## C2 — halo-padded device buffers (N+2)x(N+2), drop kernel-side bounds checks
+cuda      = 5.38188 ms (Δ +2.4% regression vs M1's 5.255)
+verify: PASS / PASS / PASS
+decision: DROP — adds an extra 4 bytes of padding on each row and a stride
+          parameter; saved branches were already free in nvcc's predicated
+          form. Plus an extra cudaMemcpy to clear d_next's outer ring.
+
+---
