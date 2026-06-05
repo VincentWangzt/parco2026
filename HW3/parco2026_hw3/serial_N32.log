@@ -1,4 +1,4 @@
 Executing serial prefix sum with N = 32
-Serial compute time: 0.000177 ms
+Serial compute time: 0.001634 ms
 Wrote result to scan_N32.txt
 y = 13 43 90 154 235 333 448 580 729 895 1078 1278 1495 1729 1980 2248 2533 2835 3154 3490 3843 4213 4600 5004 5425 5863 6318 6790 7279 7785 8308 8848

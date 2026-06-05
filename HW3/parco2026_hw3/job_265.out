@@ -1,0 +1,177 @@
+============================================================
+Host    : localhost.localdomain
+Date    : Fri Jun  5 16:27:57 CST 2026
+CWD     : /home/parco2026_2300010750/parco2026/HW3/parco2026_hw3
+nvcc    : /share/software/cuda-12.4/bin/nvcc
+Build cuda_12.4.r12.4/compiler.34097967_0
+------------------------------------------------------------
+Fri Jun  5 16:27:59 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 550.127.05             Driver Version: 550.127.05     CUDA Version: 12.4     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 2080 Ti     Off |   00000000:3B:00.0 Off |                  N/A |
+| 36%   46C    P0             41W /  250W |       1MiB /  11264MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+============================================================
+rm -f serial parallel *.o
+g++ -std=c++11 -O3 -o serial serial.cpp
+nvcc -std=c++11 -O3 -o parallel parallel.cu
+
+=================  Case S  (N = 32)  =================
+Executing serial prefix sum with N = 32
+Serial compute time: 0.001634 ms
+Wrote result to scan_N32.txt
+y = 13 43 90 154 235 333 448 580 729 895 1078 1278 1495 1729 1980 2248 2533 2835 3154 3490 3843 4213 4600 5004 5425 5863 6318 6790 7279 7785 8308 8848
+Executing CUDA prefix sum with N = 32
+GPU: NVIDIA GeForce RTX 2080 Ti (CC 7.5)
+BLOCK_SIZE = 256, ELEMENTS_PER_BLOCK = 512
+CUDA scan (kernels only): 0.031104 ms
+CUDA total (gen+scan+D2H): 0.858144 ms
+Wrote result to scan_N32.txt
+y = 13 43 90 154 235 333 448 580 729 895 1078 1278 1495 1729 1980 2248 2533 2835 3154 3490 3843 4213 4600 5004 5425 5863 6318 6790 7279 7785 8308 8848
+PASS: all 32 elements match the reference prefix sum.
+      y[0] = 13, y[-1] = 8848
+
+=================  Case M  (N = 1000003)  =================
+Executing serial prefix sum with N = 1000003
+Serial compute time: 2.00601 ms
+Wrote result to scan_N1000003.txt
+Executing CUDA prefix sum with N = 1000003
+GPU: NVIDIA GeForce RTX 2080 Ti (CC 7.5)
+BLOCK_SIZE = 256, ELEMENTS_PER_BLOCK = 512
+CUDA scan (kernels only): 0.12192 ms
+CUDA total (gen+scan+D2H): 10.5899 ms
+Wrote result to scan_N1000003.txt
+PASS: all 1000003 elements match the reference prefix sum.
+      y[0] = 13, y[-1] = 499500090
+
+================  Case L  (N = 8388608)  ================
+[Serial] running 51 timed iterations...
+Serial run  1: 34.4532 ms
+Serial run  2: 37.1389 ms
+Serial run  3: 17.4004 ms
+Serial run  4: 34.4084 ms
+Serial run  5: 34.3556 ms
+Serial run  6: 36.9344 ms
+Serial run  7: 34.7185 ms
+Serial run  8: 34.451 ms
+Serial run  9: 17.7942 ms
+Serial run 10: 32.0611 ms
+Serial run 11: 36.7531 ms
+Serial run 12: 34.7318 ms
+Serial run 13: 36.7406 ms
+Serial run 14: 34.3435 ms
+Serial run 15: 34.5336 ms
+Serial run 16: 36.2473 ms
+Serial run 17: 34.7577 ms
+Serial run 18: 18.0652 ms
+Serial run 19: 34.9504 ms
+Serial run 20: 34.4265 ms
+Serial run 21: 36.958 ms
+Serial run 22: 37.0265 ms
+Serial run 23: 17.5788 ms
+Serial run 24: 34.7485 ms
+Serial run 25: 31.1954 ms
+Serial run 26: 35.3518 ms
+Serial run 27: 37.0009 ms
+Serial run 28: 37.036 ms
+Serial run 29: 36.4622 ms
+Serial run 30: 35.9757 ms
+Serial run 31: 25.0456 ms
+Serial run 32: 37.0195 ms
+Serial run 33: 37.0063 ms
+Serial run 34: 37.2631 ms
+Serial run 35: 17.6636 ms
+Serial run 36: 17.8169 ms
+Serial run 37: 28.2448 ms
+Serial run 38: 34.342 ms
+Serial run 39: 17.4344 ms
+Serial run 40: 35.5009 ms
+Serial run 41: 36.8607 ms
+Serial run 42: 17.2644 ms
+Serial run 43: 37.0215 ms
+Serial run 44: 34.6793 ms
+Serial run 45: 34.7093 ms
+Serial run 46: 37.0231 ms
+Serial run 47: 36.794 ms
+Serial run 48: 17.6913 ms
+Serial run 49: 17.3979 ms
+Serial run 50: 36.9478 ms
+Serial run 51: 37.2401 ms
+PASS: all 8388608 elements match the reference prefix sum.
+      y[0] = 13, y[-1] = 4190102880
+[Parallel] warmup + 51 timed iterations...
+CUDA run  1: scan=0.545056 ms, total=31.5126 ms
+CUDA run  2: scan=0.546816 ms, total=35.9806 ms
+CUDA run  3: scan=0.546816 ms, total=38.8691 ms
+CUDA run  4: scan=0.544768 ms, total=30.9268 ms
+CUDA run  5: scan=0.544672 ms, total=39.6781 ms
+CUDA run  6: scan=0.548 ms, total=45.9238 ms
+CUDA run  7: scan=0.54672 ms, total=46.5644 ms
+CUDA run  8: scan=0.544768 ms, total=43.0585 ms
+CUDA run  9: scan=0.544736 ms, total=34.6037 ms
+CUDA run 10: scan=0.545376 ms, total=66.3001 ms
+CUDA run 11: scan=0.5448 ms, total=65.0947 ms
+CUDA run 12: scan=0.548864 ms, total=63.6192 ms
+CUDA run 13: scan=0.548864 ms, total=64.509 ms
+CUDA run 14: scan=0.548864 ms, total=63.3564 ms
+CUDA run 15: scan=0.547936 ms, total=62.3958 ms
+CUDA run 16: scan=0.548256 ms, total=63.8987 ms
+CUDA run 17: scan=0.54608 ms, total=63.2596 ms
+CUDA run 18: scan=0.54672 ms, total=32.404 ms
+CUDA run 19: scan=0.546848 ms, total=77.5508 ms
+CUDA run 20: scan=0.548352 ms, total=32.2419 ms
+CUDA run 21: scan=0.548128 ms, total=64.5651 ms
+CUDA run 22: scan=0.548672 ms, total=63.1317 ms
+CUDA run 23: scan=0.54848 ms, total=75.0962 ms
+CUDA run 24: scan=0.548288 ms, total=75.0976 ms
+CUDA run 25: scan=0.548864 ms, total=75.7925 ms
+CUDA run 26: scan=0.548416 ms, total=75.7062 ms
+CUDA run 27: scan=0.546528 ms, total=32.8181 ms
+CUDA run 28: scan=0.54704 ms, total=51.4537 ms
+CUDA run 29: scan=0.548672 ms, total=37.6084 ms
+CUDA run 30: scan=0.54896 ms, total=74.6756 ms
+CUDA run 31: scan=0.548416 ms, total=74.7096 ms
+CUDA run 32: scan=0.569312 ms, total=51.7756 ms
+CUDA run 33: scan=0.547424 ms, total=76.0714 ms
+CUDA run 34: scan=0.54736 ms, total=73.2163 ms
+CUDA run 35: scan=0.548576 ms, total=73.7785 ms
+CUDA run 36: scan=0.546656 ms, total=56.1288 ms
+CUDA run 37: scan=0.548864 ms, total=45.2952 ms
+CUDA run 38: scan=0.549248 ms, total=72.5882 ms
+CUDA run 39: scan=0.548736 ms, total=71.4006 ms
+CUDA run 40: scan=0.547744 ms, total=71.111 ms
+CUDA run 41: scan=0.549024 ms, total=70.7478 ms
+CUDA run 42: scan=0.548864 ms, total=74.3695 ms
+CUDA run 43: scan=0.548864 ms, total=72.2891 ms
+CUDA run 44: scan=0.547232 ms, total=73.7673 ms
+CUDA run 45: scan=0.54848 ms, total=72.9346 ms
+CUDA run 46: scan=0.546944 ms, total=56.424 ms
+CUDA run 47: scan=0.54784 ms, total=71.3921 ms
+CUDA run 48: scan=0.546816 ms, total=72.5071 ms
+CUDA run 49: scan=0.546912 ms, total=48.6589 ms
+CUDA run 50: scan=0.546336 ms, total=72.9675 ms
+CUDA run 51: scan=0.547136 ms, total=73.6119 ms
+PASS: all 8388608 elements match the reference prefix sum.
+      y[0] = 13, y[-1] = 4190102880
+
+================  Case L summary (N = 8388608, 51 runs)  ================
+Serial      : median = 34.7318 ms   [min 17.2644, max 37.2631]
+CUDA scan   : median = 0.54784 ms   [min 0.544672, max 0.569312]
+CUDA total  : median = 64.509 ms
+Speedup (scan only) : 63.40x
+Speedup (incl. D2H) : 0.54x
+Done.
