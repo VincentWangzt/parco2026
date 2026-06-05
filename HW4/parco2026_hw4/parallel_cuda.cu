@@ -67,14 +67,21 @@ static void write_grid(const std::vector<unsigned char>& grid, int N, int T) {
     std::cerr << "ERROR: cannot open output file " << filename << "\n";
     std::exit(1);
   }
+  // Build the entire payload in one preallocated buffer, then a single write.
+  // Each row contributes 2*N chars (digit + space/newline). The header is
+  // small enough to write directly. This avoids ~N*N std::ostream operator<<
+  // calls which dominated wall time at N=1024.
   ofs << N << " " << N << "\n";
+  std::string buf;
+  buf.resize(static_cast<size_t>(N) * 2 * N);
+  size_t pos = 0;
   for (int i = 0; i < N; ++i) {
     for (int j = 0; j < N; ++j) {
-      ofs << static_cast<int>(grid[i * N + j]);
-      if (j + 1 < N) ofs << " ";
+      buf[pos++] = static_cast<char>('0' + grid[i * N + j]);
+      buf[pos++] = (j + 1 < N) ? ' ' : '\n';
     }
-    ofs << "\n";
   }
+  ofs.write(buf.data(), static_cast<std::streamsize>(pos));
   std::cout << "Wrote result to " << filename << "\n";
 }
 

@@ -124,3 +124,20 @@ decision: KEEP — clear and large win. 32 threads in x = a warp doing fully
           coalesced byte loads; 4 rows = 4 warps/block keeps occupancy good.
 
 ---
+
+## QoL — buffered write_grid (single ofs.write instead of per-cell <<)
+serial    = 2711.58 ms
+mpi_np1   = 330.752 ms
+mpi_np2   = 167.831 ms
+mpi_np4   = 90.8221 ms
+mpi_np8   = 82.4178 ms
+mpi_np16  = 41.3132 ms
+cuda      = 3.17433 ms
+verify: PASS / PASS / PASS
+notes: I/O happens outside the timed compute kernels, so the table here
+  reflects run-to-run noise rather than a kernel speedup. Wall time on
+  large outputs (Case L 1024x1024 = 2 MB) is much faster: an N=1024 write
+  drops from ~80 ms (per-cell <<) to ~10 ms (one write()) — same data,
+  just one heap allocation and one buffered write.
+applied across: serial.cpp, parallel_mpi.cpp, parallel_cuda.cu (same
+  pattern in each).

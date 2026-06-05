@@ -47,14 +47,18 @@ void write_grid(const std::vector<unsigned char>& grid, int N, int T) {
     std::cerr << "ERROR: cannot open output file " << filename << "\n";
     std::exit(1);
   }
+  // Buffer the whole payload, then one write() call (vs ~N*N operator<<).
   ofs << N << " " << N << "\n";
+  std::string buf;
+  buf.resize(static_cast<size_t>(N) * 2 * N);
+  size_t pos = 0;
   for (int i = 0; i < N; ++i) {
     for (int j = 0; j < N; ++j) {
-      ofs << static_cast<int>(grid[idx(i, j, N)]);
-      if (j + 1 < N) ofs << " ";
+      buf[pos++] = static_cast<char>('0' + grid[idx(i, j, N)]);
+      buf[pos++] = (j + 1 < N) ? ' ' : '\n';
     }
-    ofs << "\n";
   }
+  ofs.write(buf.data(), static_cast<std::streamsize>(pos));
   std::cout << "Wrote result to " << filename << "\n";
 }
 
