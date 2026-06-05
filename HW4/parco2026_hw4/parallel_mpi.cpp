@@ -115,38 +115,52 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
   auto t0 = std::chrono::high_resolution_clock::now();
 
-  for (int step = 0; step < T; ++step) {
-    // Exchange ghost rows (only the N real cells; ghost cols stay zero).
-    unsigned char* top_row = &current[1 * stride + 1];
-    unsigned char* bot_row = &current[local_rows * stride + 1];
-    unsigned char* top_ghost = &current[0 * stride + 1];
-    unsigned char* bot_ghost = &current[(local_rows + 1) * stride + 1];
+  // Inline cell update: compute next[i*stride + j] from current rows i-1, i, i+1.
+  auto update_row = [&](unsigned char* cur, unsigned char* nxt, int i) {
+    const unsigned char* up_r = &cur[(i - 1) * stride];
+    const unsigned char* mid  = &cur[i * stride];
+    const unsigned char* dn_r = &cur[(i + 1) * stride];
+    unsigned char* out = &nxt[i * stride];
+    for (int j = 1; j <= N; ++j) {
+      int cnt = up_r[j - 1] + up_r[j] + up_r[j + 1]
+              + mid[j - 1]            + mid[j + 1]
+              + dn_r[j - 1] + dn_r[j] + dn_r[j + 1];
+      int alive = mid[j];
+      out[j] = (alive ? (cnt == 2 || cnt == 3) : (cnt == 3)) ? 1 : 0;
+    }
+  };
 
-    MPI_Sendrecv(top_row, N, MPI_UNSIGNED_CHAR, up, 0,
-                 bot_ghost, N, MPI_UNSIGNED_CHAR, down, 0,
-                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Sendrecv(bot_row, N, MPI_UNSIGNED_CHAR, down, 1,
-                 top_ghost, N, MPI_UNSIGNED_CHAR, up, 1,
-                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  for (int step = 0; step < T; ++step) {
+    // Exchange ghost rows asynchronously so we can update interior rows
+    // (which don't read either ghost) while the halo is in flight.
+    unsigned char* cur = current.data();
+    unsigned char* nxt = next.data();
+    unsigned char* top_row   = &cur[1 * stride + 1];
+    unsigned char* bot_row   = &cur[local_rows * stride + 1];
+    unsigned char* top_ghost = &cur[0 * stride + 1];
+    unsigned char* bot_ghost = &cur[(local_rows + 1) * stride + 1];
+
+    MPI_Request reqs[4];
+    int nreq = 0;
+    MPI_Irecv(top_ghost, N, MPI_UNSIGNED_CHAR, up,   1, MPI_COMM_WORLD, &reqs[nreq++]);
+    MPI_Irecv(bot_ghost, N, MPI_UNSIGNED_CHAR, down, 0, MPI_COMM_WORLD, &reqs[nreq++]);
+    MPI_Isend(top_row,   N, MPI_UNSIGNED_CHAR, up,   0, MPI_COMM_WORLD, &reqs[nreq++]);
+    MPI_Isend(bot_row,   N, MPI_UNSIGNED_CHAR, down, 1, MPI_COMM_WORLD, &reqs[nreq++]);
+
+    // Update interior rows [2, local_rows-1] (don't touch ghosts) while the
+    // halo exchange progresses. With local_rows < 3 there are no interior rows.
+    for (int i = 2; i <= local_rows - 1; ++i) {
+      update_row(cur, nxt, i);
+    }
+
+    MPI_Waitall(nreq, reqs, MPI_STATUSES_IGNORE);
     if (up == MPI_PROC_NULL)   std::memset(top_ghost, 0, N);
     if (down == MPI_PROC_NULL) std::memset(bot_ghost, 0, N);
 
-    // Update local rows. With ghost cols pinned at zero we can drop the
-    // jl/jr branches: the loop body is a flat 8-add reduction the compiler
-    // can vectorise.
-    for (int i = 1; i <= local_rows; ++i) {
-      const unsigned char* up_r = &current[(i - 1) * stride];
-      const unsigned char* mid  = &current[i * stride];
-      const unsigned char* dn_r = &current[(i + 1) * stride];
-      unsigned char* out = &next[i * stride];
-      for (int j = 1; j <= N; ++j) {
-        int cnt = up_r[j - 1] + up_r[j] + up_r[j + 1]
-                + mid[j - 1]            + mid[j + 1]
-                + dn_r[j - 1] + dn_r[j] + dn_r[j + 1];
-        int alive = mid[j];
-        out[j] = (alive ? (cnt == 2 || cnt == 3) : (cnt == 3)) ? 1 : 0;
-      }
-    }
+    // Now safe to update the two boundary rows that depend on ghost rows.
+    update_row(cur, nxt, 1);
+    if (local_rows >= 2) update_row(cur, nxt, local_rows);
+
     current.swap(next);
   }
 

@@ -44,3 +44,16 @@ verify: PASS / PASS / PASS
 decision: KEEP — clear inner-kernel win at mpi_np4; no regressions
 
 ---
+
+## M2 — non-blocking Isend/Irecv halo with interior-row compute overlap
+serial    = 3121.69 ms
+mpi_np1   = 331.956 ms  (Δ +0.1%)
+mpi_np4   = 95.169  ms  (Δ +2.7% regression)
+mpi_np8   = 81.7163 ms  (Δ -0.5%)
+mpi_np16  = 41.0128 ms  (Δ -0.7%)
+cuda      = 5.34096 ms  (untouched)
+verify: PASS / PASS / PASS
+decision: DROP — overlap does not pay off when MPI is already on shared-memory
+          (vader) BTL; comm is cheap, interior-row split adds cache pollution.
+
+---
