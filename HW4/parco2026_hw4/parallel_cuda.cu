@@ -51,11 +51,11 @@ __global__ void life_step_kernel(const unsigned char* __restrict__ in,
       int ni = i + di;
       int nj = j + dj;
       if (ni >= 0 && ni < N && nj >= 0 && nj < N) {
-        cnt += __ldg(&in[ni * N + nj]);
+        cnt += in[ni * N + nj];
       }
     }
   }
-  int alive = __ldg(&in[i * N + j]);
+  int alive = in[i * N + j];
   out[i * N + j] =
       (unsigned char)((alive ? (cnt == 2 || cnt == 3) : (cnt == 3)) ? 1 : 0);
 }
