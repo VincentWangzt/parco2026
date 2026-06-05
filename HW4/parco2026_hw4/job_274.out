@@ -1,0 +1,279 @@
+=== node:    localhost.localdomain
+=== date:    Fri Jun  5 20:51:41 CST 2026
+=== nproc:   72
+=== nvcc:    /share/software/cuda-12.4/bin/nvcc
+Build cuda_12.4.r12.4/compiler.34097967_0
+Fri Jun  5 20:51:43 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 550.127.05             Driver Version: 550.127.05     CUDA Version: 12.4     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 2080 Ti     Off |   00000000:3B:00.0 Off |                  N/A |
+| 36%   46C    P0             41W /  250W |       1MiB /  11264MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+rm -f serial parallel_mpi parallel_cuda *.o life_N*_T*.txt
+g++ -std=c++11 -O2 -o serial serial.cpp
+mpicxx -std=c++11 -O3 -o parallel_mpi parallel_mpi.cpp
+nvcc -std=c++11 -O3 -arch=sm_60 -o parallel_cuda parallel_cuda.cu
+
+==== Case S serial  (N=16, T=4) ====
+Executing serial Game of Life with N = 16, T = 4
+Serial compute time: 0.040853 ms
+Wrote result to life_N16_T4.txt
+0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 0 1 0 0 0 0 0 0 0 0 0 0 1 0 0
+1 0 0 1 0 0 0 0 0 0 0 0 0 1 0 0
+1 1 0 1 0 0 0 0 0 0 0 0 0 0 1 1
+0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0
+1 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0
+1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+PASS: final grid matches the reference for N=16, T=4.
+      live cells = 39
+
+==== Case S MPI -np 4  (N=16, T=4) ====
+Executing MPI Game of Life with N = 16, T = 4, P = 4
+MPI compute time: 0.030835 ms
+Wrote result to life_N16_T4.txt
+0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 0 1 0 0 0 0 0 0 0 0 0 0 1 0 0
+1 0 0 1 0 0 0 0 0 0 0 0 0 1 0 0
+1 1 0 1 0 0 0 0 0 0 0 0 0 0 1 1
+0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0
+1 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0
+1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+PASS: final grid matches the reference for N=16, T=4.
+      live cells = 39
+
+==== Case S CUDA  (N=16, T=4) ====
+Executing CUDA Game of Life with N = 16, T = 4
+CUDA compute time: 0.023342 ms
+Wrote result to life_N16_T4.txt
+0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 0 1 0 0 0 0 0 0 0 0 0 0 1 0 0
+1 0 0 1 0 0 0 0 0 0 0 0 0 1 0 0
+1 1 0 1 0 0 0 0 0 0 0 0 0 0 1 1
+0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0
+1 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0
+1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+PASS: final grid matches the reference for N=16, T=4.
+      live cells = 39
+
+==== Case M serial  (N=257, T=100) ====
+Executing serial Game of Life with N = 257, T = 100
+Serial compute time: 164.619 ms
+Wrote result to life_N257_T100.txt
+PASS: final grid matches the reference for N=257, T=100.
+      live cells = 155
+
+==== Case M MPI -np 4  (N=257, T=100) ====
+Executing MPI Game of Life with N = 257, T = 100, P = 4
+MPI compute time: 5.83469 ms
+Wrote result to life_N257_T100.txt
+PASS: final grid matches the reference for N=257, T=100.
+      live cells = 155
+
+==== Case M CUDA  (N=257, T=100) ====
+Executing CUDA Game of Life with N = 257, T = 100
+CUDA compute time: 0.29606 ms
+Wrote result to life_N257_T100.txt
+PASS: final grid matches the reference for N=257, T=100.
+      live cells = 155
+
+==== Case L benchmark (raw timings, 21 runs per variant) ====
+Case L serial    run  1: 5107.26 ms
+Case L serial    run  2: 4710.28 ms
+Case L serial    run  3: 4719.11 ms
+Case L serial    run  4: 4976.45 ms
+Case L serial    run  5: 5103.94 ms
+Case L serial    run  6: 5214.74 ms
+Case L serial    run  7: 5206.03 ms
+Case L serial    run  8: 5236.86 ms
+Case L serial    run  9: 5215.03 ms
+Case L serial    run 10: 5189.1 ms
+Case L serial    run 11: 5246.01 ms
+Case L serial    run 12: 5229.51 ms
+Case L serial    run 13: 5143.84 ms
+Case L serial    run 14: 5145.67 ms
+Case L serial    run 15: 5175.05 ms
+Case L serial    run 16: 5217.76 ms
+Case L serial    run 17: 5143.24 ms
+Case L serial    run 18: 5252.42 ms
+Case L serial    run 19: 5233.88 ms
+Case L serial    run 20: 5237.68 ms
+Case L serial    run 21: 5195.25 ms
+Case L mpi_np1   run  1: 691.729 ms
+Case L mpi_np1   run  2: 673.837 ms
+Case L mpi_np1   run  3: 659.416 ms
+Case L mpi_np1   run  4: 674.23 ms
+Case L mpi_np1   run  5: 673.861 ms
+Case L mpi_np1   run  6: 679.456 ms
+Case L mpi_np1   run  7: 679.951 ms
+Case L mpi_np1   run  8: 677.038 ms
+Case L mpi_np1   run  9: 677.685 ms
+Case L mpi_np1   run 10: 675.402 ms
+Case L mpi_np1   run 11: 674.716 ms
+Case L mpi_np1   run 12: 676.517 ms
+Case L mpi_np1   run 13: 659.707 ms
+Case L mpi_np1   run 14: 678.878 ms
+Case L mpi_np1   run 15: 673.764 ms
+Case L mpi_np1   run 16: 679.069 ms
+Case L mpi_np1   run 17: 674.857 ms
+Case L mpi_np1   run 18: 676.752 ms
+Case L mpi_np1   run 19: 676.321 ms
+Case L mpi_np1   run 20: 674.86 ms
+Case L mpi_np1   run 21: 678.912 ms
+Case L mpi_np2   run  1: 355.214 ms
+Case L mpi_np2   run  2: 344.728 ms
+Case L mpi_np2   run  3: 345.635 ms
+Case L mpi_np2   run  4: 341.705 ms
+Case L mpi_np2   run  5: 339.922 ms
+Case L mpi_np2   run  6: 341.253 ms
+Case L mpi_np2   run  7: 343.712 ms
+Case L mpi_np2   run  8: 344.851 ms
+Case L mpi_np2   run  9: 345.093 ms
+Case L mpi_np2   run 10: 344.391 ms
+Case L mpi_np2   run 11: 346.882 ms
+Case L mpi_np2   run 12: 344.314 ms
+Case L mpi_np2   run 13: 343.959 ms
+Case L mpi_np2   run 14: 344.967 ms
+Case L mpi_np2   run 15: 346.601 ms
+Case L mpi_np2   run 16: 345.83 ms
+Case L mpi_np2   run 17: 339.112 ms
+Case L mpi_np2   run 18: 336.214 ms
+Case L mpi_np2   run 19: 344.047 ms
+Case L mpi_np2   run 20: 339.902 ms
+Case L mpi_np2   run 21: 341.043 ms
+Case L mpi_np4   run  1: 171.487 ms
+Case L mpi_np4   run  2: 194.342 ms
+Case L mpi_np4   run  3: 188.582 ms
+Case L mpi_np4   run  4: 183.852 ms
+Case L mpi_np4   run  5: 171.314 ms
+Case L mpi_np4   run  6: 179.711 ms
+Case L mpi_np4   run  7: 185.219 ms
+Case L mpi_np4   run  8: 169.642 ms
+Case L mpi_np4   run  9: 207.528 ms
+Case L mpi_np4   run 10: 184.002 ms
+Case L mpi_np4   run 11: 211.149 ms
+Case L mpi_np4   run 12: 170.67 ms
+Case L mpi_np4   run 13: 185.003 ms
+Case L mpi_np4   run 14: 171.275 ms
+Case L mpi_np4   run 15: 184.559 ms
+Case L mpi_np4   run 16: 194.645 ms
+Case L mpi_np4   run 17: 181.714 ms
+Case L mpi_np4   run 18: 201.379 ms
+Case L mpi_np4   run 19: 199.618 ms
+Case L mpi_np4   run 20: 170.67 ms
+Case L mpi_np4   run 21: 181.912 ms
+Case L mpi_np8   run  1: 108.38 ms
+Case L mpi_np8   run  2: 109.228 ms
+Case L mpi_np8   run  3: 97.9173 ms
+Case L mpi_np8   run  4: 120.08 ms
+Case L mpi_np8   run  5: 105.354 ms
+Case L mpi_np8   run  6: 113.433 ms
+Case L mpi_np8   run  7: 108.966 ms
+Case L mpi_np8   run  8: 114.196 ms
+Case L mpi_np8   run  9: 97.2302 ms
+Case L mpi_np8   run 10: 117.79 ms
+Case L mpi_np8   run 11: 99.8747 ms
+Case L mpi_np8   run 12: 104.993 ms
+Case L mpi_np8   run 13: 115.821 ms
+Case L mpi_np8   run 14: 105.465 ms
+Case L mpi_np8   run 15: 122.236 ms
+Case L mpi_np8   run 16: 104.345 ms
+Case L mpi_np8   run 17: 106.624 ms
+Case L mpi_np8   run 18: 110.542 ms
+Case L mpi_np8   run 19: 101.286 ms
+Case L mpi_np8   run 20: 112.065 ms
+Case L mpi_np8   run 21: 103.52 ms
+Case L mpi_np16  run  1: 77.5182 ms
+Case L mpi_np16  run  2: 74.0308 ms
+Case L mpi_np16  run  3: 81.106 ms
+Case L mpi_np16  run  4: 83.6291 ms
+Case L mpi_np16  run  5: 85.9471 ms
+Case L mpi_np16  run  6: 82.8572 ms
+Case L mpi_np16  run  7: 79.6253 ms
+Case L mpi_np16  run  8: 75.6841 ms
+Case L mpi_np16  run  9: 84.3825 ms
+Case L mpi_np16  run 10: 80.7576 ms
+Case L mpi_np16  run 11: 81.6653 ms
+Case L mpi_np16  run 12: 80.8128 ms
+Case L mpi_np16  run 13: 79.1857 ms
+Case L mpi_np16  run 14: 77.3963 ms
+Case L mpi_np16  run 15: 74.1165 ms
+Case L mpi_np16  run 16: 95.0311 ms
+Case L mpi_np16  run 17: 80.0183 ms
+Case L mpi_np16  run 18: 83.1048 ms
+Case L mpi_np16  run 19: 82.3301 ms
+Case L mpi_np16  run 20: 85.8744 ms
+Case L mpi_np16  run 21: 82.7797 ms
+Case L cuda      run  1: 2.55367 ms
+Case L cuda      run  2: 2.50799 ms
+Case L cuda      run  3: 2.54039 ms
+Case L cuda      run  4: 2.55018 ms
+Case L cuda      run  5: 2.51728 ms
+Case L cuda      run  6: 2.55753 ms
+Case L cuda      run  7: 2.50443 ms
+Case L cuda      run  8: 2.53628 ms
+Case L cuda      run  9: 2.53403 ms
+Case L cuda      run 10: 2.53009 ms
+Case L cuda      run 11: 2.53636 ms
+Case L cuda      run 12: 2.52695 ms
+Case L cuda      run 13: 2.53012 ms
+Case L cuda      run 14: 2.52183 ms
+Case L cuda      run 15: 2.50825 ms
+Case L cuda      run 16: 2.49353 ms
+Case L cuda      run 17: 2.57842 ms
+Case L cuda      run 18: 2.50482 ms
+Case L cuda      run 19: 2.54893 ms
+Case L cuda      run 20: 2.5435 ms
+Case L cuda      run 21: 2.52239 ms
+
+==== Case L summary ====
+Case L serial: median=5195.25 ms, speedup=1.00x
+Case L mpi_np1: median=676.321 ms, speedup=7.68x
+Case L mpi_np2: median=344.314 ms, speedup=15.09x
+Case L mpi_np4: median=184.002 ms, speedup=28.23x
+Case L mpi_np8: median=108.38 ms, speedup=47.94x
+Case L mpi_np16: median=81.106 ms, speedup=64.06x
+Case L cuda: median=2.53012 ms, speedup=2053.36x
+Done!
